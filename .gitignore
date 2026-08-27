@@ -1,0 +1,22 @@
+# ===== 编译产物 =====
+build/
+
+# ===== CubeMX 临时与备份 =====
+mx.scratch/
+*.bak-*
+CubeMX_Config.ioc.bak-*
+
+# ===== IDE / 本地工具配置 =====
+.vscode/
+.settings/
+.idea/
+*.user
+.cache/
+.omo/
+
+# ===== 本地索引 =====
+.clangd
+
+# ===== 系统文件 =====
+Thumbs.db
+.DS_Store

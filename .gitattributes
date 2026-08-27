@@ -1,0 +1,25 @@
+# 统一行尾：仓库存 LF，Windows 工作区按需换行
+* text=auto
+
+# 脚本/构建文件强制 LF
+*.sh text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+CMakePresets.json text eol=lf
+*.ld text eol=lf
+*.s text eol=lf
+
+# 二进制文件明确标记
+*.elf binary
+*.axf binary
+*.bin binary
+*.hex binary
+*.o binary
+*.a binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.gif binary
+*.ico binary
