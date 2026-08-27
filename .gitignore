@@ -20,3 +20,6 @@ CubeMX_Config.ioc.bak-*
 # ===== 系统文件 =====
 Thumbs.db
 .DS_Store
+
+# ===== WorkBuddy 项目数据 =====
+.workbuddy/
