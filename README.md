@@ -78,9 +78,8 @@ cmake --build build/Debug
 ## 当前进度
 
 - [x] 工程骨架：CubeMX + CMake/Ninja 构建链路打通
-- [x] MPU6050 驱动 + 姿态解算（一阶互补滤波）
-- [x] TFTLCD 显示（480×800 竖屏）
-- [ ] Madgwick 姿态解算算法替换（进行中）
+- [x] CubeMX 外设初始化：以太网（RMII）、FreeRTOS、LwIP、FSMC、SPI1/2、USART1/3、RTC、IWDG、SDIO、USB OTG、DAC、TIM
+- [ ] 业务功能开发（待开始）：传感器驱动、显示、应用逻辑等
 
 ## 声明
 
