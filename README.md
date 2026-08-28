@@ -31,11 +31,12 @@
 
 | 项   | 规格                                   |
 | --- | ------------------------------------ |
-| 主控  | STM32F407ZET6（Cortex-M4F @ 168MHz）   |
+| 主控  | STM32F407ZGT6（Cortex-M4F @ 168MHz）   |
 | 开发板 | 正点原子探索者 V2.2                         |
 | 传感器 | MPU6050 六轴 IMU                       |
-| 显示  | TFTLCD 480×800 竖屏（SSD1963 / NT35510） |
-| 中间件 | FreeRTOS + LwIP（以太网）                 |
+| 显示  | TFTLCD 480×800 竖屏（NT35510, FSMC 8080 并口） |
+| 触摸  | GT9147 电容触摸（模拟 I2C，实测 IC 为 GT917S，寄存器兼容） |
+| 中间件 | FreeRTOS + LwIP（以太网）+ LVGL 8.3.11   |
 
 ## 工具链
 
@@ -59,9 +60,10 @@
 ```
 ├── CMakeLists.txt / CMakePresets.json   # 构建入口
 ├── CubeMX_Config.ioc                    # CubeMX 硬件配置
+├── lv_conf.h                            # LVGL 配置（内存池置于外部 SRAM）
 ├── Src/  Inc/                           # 源码（AI 生成 + 人工审核）
 ├── Drivers/                             # HAL / CMSIS + BSP 板级驱动
-├── Middlewares/                         # FreeRTOS / LwIP
+├── Middlewares/                         # FreeRTOS / LwIP / LVGL
 ├── cmake/                               # 工具链配置与源文件清单
 └── board/                               # 板级参考配置
 ```
@@ -79,7 +81,19 @@ cmake --build build/Debug
 
 - [x] 工程骨架：CubeMX + CMake/Ninja 构建链路打通
 - [x] CubeMX 外设初始化：以太网（RMII）、FreeRTOS、LwIP、FSMC、SPI1/2、USART1/3、RTC、IWDG、SDIO、USB OTG、DAC、TIM
-- [ ] 业务功能开发（待开始）：传感器驱动、显示、应用逻辑等
+- [x] TFTLCD 驱动 `Src/lcd.c`：NT35510 480×800 竖屏，FSMC Bank4（NE4）8080 并口，背光 PB15
+- [x] GT9147 触摸驱动 `Src/gt9147.c`：模拟 I2C（SCL=PB0/SDA=PF11/RST=PC13/INT=PB1），地址 0x14
+      - **实测 IC 为 GT917S**（0x8140 读回 "917S"，寄存器兼容；官方例程 strcmp("9147") 在此批屏幕上同样匹配不到）
+      - 串口已验证按下/抬起事件流与坐标连续性；滑动到进度条区域坐标停更已修复（`lv_bar` 事件未冒泡）
+- [x] LVGL 8.3.11 集成：源码 + `lv_conf.h` + 显示/输入 port（`lv_port_disp.c` / `lv_port_indev.c`）
+      - LVGL 内存池 128KB 与显示缓冲 96KB（双缓冲 480×50）置于外部 SRAM IS62WV51216（FSMC NE3，CubeMX 已配置）
+      - 测试任务 `lvglTestTask`（8KB 栈）周期调度 `lv_task_handler`，界面含：进度条动画 / 按钮点击计数 / 触摸坐标实时显示 / 秒计数
+      - **编译通过**（345 编译单元，FLASH 467KB / RAM 107KB @ -O0 Debug）
+- [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑
+      `MX_LWIP_Init()`（实测调用链 ~300B），栈溢出踩坏调度器结构 → INVPC HardFault → IWDG 复位。
+      栈扩至 2KB，二分双向验证（512B 必死 / 2KB 稳定）。现串口心跳正常；屏幕显示内容与触摸坐标
+      方向仍需人工目视确认。完整证据链见 `debug-loop.md`
+- [ ] 业务功能开发（待开始）：传感器驱动、应用逻辑等
 
 ## 声明
 
