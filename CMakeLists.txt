@@ -45,11 +45,30 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Src/lcd.c
+    Src/gt9147.c
+    Src/uart_dbg.c
+    Src/lv_port_disp.c
+    Src/lv_port_indev.c
 )
+
+# LVGL 8.3.11 源码
+file(GLOB_RECURSE LVGL_SRC CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl/src/*.c
+)
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${LVGL_SRC})
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl
+)
+
+# Add project symbols (macros)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined symbols
+    LV_CONF_INCLUDE_SIMPLE
 )
 
 # Add project symbols (macros)
