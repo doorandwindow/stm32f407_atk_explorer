@@ -12,14 +12,16 @@
   */
 #include "lcd.h"
 
-/* DMA 控制 */
+/* DMA 传输状态标志 */
 static volatile uint8_t lcd_dma_busy = 0;
-#define LCD_DMA_TIMEOUT_MS 20U
+#define LCD_DMA_TIMEOUT_MS 50U
 static uint16_t lcd_dma_x1;
 static uint16_t lcd_dma_y1;
 static uint16_t lcd_dma_x2;
 static uint16_t lcd_dma_y2;
 static const uint16_t *lcd_dma_buf;
+static uint32_t lcd_dma_start_tick;
+static uint32_t lcd_dma_fallback_count;
 
 /* NT35510 初始化寄存器表 {reg, data}（381 对, 提取自正点原子探索者例程） */
 static const struct { uint16_t reg; uint16_t data; } nt35510_init_table[] = {
@@ -101,10 +103,8 @@ static void LCD_FSMC_Config(void)
     hsram.Init.WriteBurst = FSMC_WRITE_BURST_DISABLE;
     hsram.Init.PageSize = FSMC_PAGE_SIZE_NONE;
 
-    /* 激进优化 FSMC 时序: NT35510 写周期 ≥15ns, 读周期 ≥45ns, 168MHz HCLK = 6ns
-       AddressSetup=2 (12ns) + DataSetup=3 (18ns) = 30ns > 15ns 写周期, 足够
-       实测可稳定运行, 性能提升约 50% */
-    Timing.AddressSetupTime = 2;      /* 地址建立: 2 HCLK = 12ns */
+    /* NT35510 写周期 >=15ns, 读周期 >=45ns, 168MHz HCLK = 6ns. */
+    Timing.AddressSetupTime = 3;      /* 地址建立: 3 HCLK = 18ns */
     Timing.AddressHoldTime = 0;       /* 地址保持: 0 HCLK (模式A不用) */
     Timing.DataSetupTime = 3;         /* 数据建立: 3 HCLK = 18ns */
     Timing.BusTurnAroundDuration = 0;
@@ -117,7 +117,7 @@ static void LCD_FSMC_Config(void)
         Error_Handler();
     }
 
-    /* 初始化 DMA2_Stream0 用于 LCD 数据传输加速 */
+    /* ===== 初始化 DMA2_Stream0 用于 LCD 数据传输加速 ===== */
     __HAL_RCC_DMA2_CLK_ENABLE();
 
     DMA2_Stream0->CR = 0;  /* 复位 */
@@ -132,15 +132,13 @@ static void LCD_FSMC_Config(void)
                      | (1U << DMA_SxCR_PL_Pos)       /* 优先级: 中 */
                      | (1U << DMA_SxCR_MSIZE_Pos)    /* 内存数据宽度: 16bit */
                      | (1U << DMA_SxCR_PSIZE_Pos)    /* 外设数据宽度: 16bit */
-                     | DMA_SxCR_PINC                 /* PAR(源)地址递增 */
-                     | DMA_SxCR_TCIE;                /* 传输完成中断使能 */
+                     | DMA_SxCR_PINC;                /* PAR(源)地址递增 */
 
     DMA2_Stream0->FCR = DMA_SxFCR_DMDIS;  /* 禁用直接模式，使用 FIFO */
     DMA2_Stream0->FCR |= (3U << DMA_SxFCR_FTH_Pos);  /* FIFO 阈值: 全满 */
 
-    /* 使能 DMA2_Stream0 中断 */
-    NVIC_SetPriority(DMA2_Stream0_IRQn, 6);
-    NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+    /* Completion is polled from the LVGL task.  An IRQ would clear TCIF
+       before the task can observe it and force the slow CPU fallback. */
 }
 
 /**
@@ -297,6 +295,7 @@ void LCD_FillRect_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
     lcd_dma_x2 = x2;
     lcd_dma_y2 = y2;
     lcd_dma_buf = buf;
+    lcd_dma_start_tick = HAL_GetTick();
 
     /* 配置并启动 DMA */
     lcd_dma_busy = 1;
@@ -320,6 +319,41 @@ uint8_t LCD_DMA_IsBusy(void)
     return lcd_dma_busy;
 }
 
+uint8_t LCD_DMA_Poll(void)
+{
+    uint32_t flags;
+
+    if (!lcd_dma_busy) return 1;
+    flags = DMA2->LISR;
+    if (flags & DMA_LISR_TCIF0)
+    {
+        DMA2_Stream0->CR &= ~DMA_SxCR_EN;
+        DMA2->LIFCR = 0x3F;
+        lcd_dma_busy = 0;
+        return 1;
+    }
+
+    if ((flags & (DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0)) ||
+        (uint32_t)(HAL_GetTick() - lcd_dma_start_tick) > LCD_DMA_TIMEOUT_MS)
+    {
+        DMA2_Stream0->CR &= ~DMA_SxCR_EN;
+        while (DMA2_Stream0->CR & DMA_SxCR_EN) { }
+        DMA2->LIFCR = 0x3F;
+        lcd_dma_busy = 0;
+        lcd_dma_fallback_count++;
+        LCD_FillRect(lcd_dma_x1, lcd_dma_y1, lcd_dma_x2, lcd_dma_y2,
+                     lcd_dma_buf);
+        return 1;
+    }
+
+    return 0;
+}
+
+uint32_t LCD_DMA_GetFallbackCount(void)
+{
+    return lcd_dma_fallback_count;
+}
+
 /**
   * @brief 等待 DMA 完成
   */
@@ -329,37 +363,10 @@ void LCD_DMA_Wait(void)
 
     while (lcd_dma_busy)
     {
-        uint32_t flags = DMA2->LISR;
-        if (flags & DMA_LISR_TCIF0)
-        {
-            DMA2->LIFCR = DMA_LIFCR_CFEIF0 | DMA_LIFCR_CDMEIF0 |
-                          DMA_LIFCR_CTEIF0 | DMA_LIFCR_CHTIF0 |
-                          DMA_LIFCR_CTCIF0;
-            lcd_dma_busy = 0;
-            break;
-        }
-
-        if (flags & (DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0))
-        {
-            DMA2_Stream0->CR &= ~DMA_SxCR_EN;
-            while (DMA2_Stream0->CR & DMA_SxCR_EN) { }
-            DMA2->LIFCR = DMA_LIFCR_CFEIF0 | DMA_LIFCR_CDMEIF0 |
-                          DMA_LIFCR_CTEIF0 | DMA_LIFCR_CHTIF0 |
-                          DMA_LIFCR_CTCIF0;
-            lcd_dma_busy = 0;
-            LCD_FillRect(lcd_dma_x1, lcd_dma_y1, lcd_dma_x2, lcd_dma_y2,
-                         lcd_dma_buf);
-            break;
-        }
-
+        if (LCD_DMA_Poll()) break;
         if ((HAL_GetTick() - start) > LCD_DMA_TIMEOUT_MS)
         {
-            DMA2_Stream0->CR &= ~DMA_SxCR_EN;
-            while (DMA2_Stream0->CR & DMA_SxCR_EN) { }
-            DMA2->LIFCR = 0x3F;
-            lcd_dma_busy = 0;
-            LCD_FillRect(lcd_dma_x1, lcd_dma_y1, lcd_dma_x2, lcd_dma_y2,
-                         lcd_dma_buf);
+            (void)LCD_DMA_Poll();
             break;
         }
     }
@@ -373,11 +380,11 @@ void DMA2_Stream0_IRQHandler(void)
     if (DMA2->LISR & DMA_LISR_TCIF0)  /* 传输完成 */
     {
         DMA2->LIFCR = DMA_LIFCR_CTCIF0;  /* 清除标志 */
-        lcd_dma_busy = 0;
+        /* Completion is consumed by LCD_DMA_Poll() in task context. */
     }
     if (DMA2->LISR & DMA_LISR_TEIF0)  /* 传输错误 */
     {
         DMA2->LIFCR = DMA_LIFCR_CTEIF0;
-        lcd_dma_busy = 0;
+        /* Error is consumed by LCD_DMA_Poll() in task context. */
     }
 }

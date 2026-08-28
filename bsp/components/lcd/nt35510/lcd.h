@@ -35,10 +35,12 @@ void    LCD_Clear(uint16_t color);
 void    LCD_FillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
                      const uint16_t *buf);     /* 批量填充区域（LVGL flush 用） */
 
-/* DMA 加速传输 */
+/* ---- DMA 加速传输 ---- */
 void    LCD_FillRect_DMA(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
                          const uint16_t *buf);  /* DMA 加速版本 */
 uint8_t LCD_DMA_IsBusy(void);                   /* 检查 DMA 是否忙 */
+uint8_t LCD_DMA_Poll(void);                     /* 非阻塞检查 DMA */
+uint32_t LCD_DMA_GetFallbackCount(void);        /* DMA 错误/超时回退次数 */
 void    LCD_DMA_Wait(void);                     /* 等待 DMA 完成 */
 
 #endif /* __LCD_H */

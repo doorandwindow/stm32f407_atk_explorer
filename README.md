@@ -60,22 +60,54 @@
 ```
 ├── CMakeLists.txt / CMakePresets.json   # 构建入口
 ├── CubeMX_Config.ioc                    # CubeMX 硬件配置
-├── lv_conf.h                            # LVGL 配置（内存池置于外部 SRAM）
-├── Src/  Inc/                           # 源码（AI 生成 + 人工审核）
-├── Drivers/                             # HAL / CMSIS + BSP 板级驱动
+├── config/                              # 配置文件集中管理（lv_conf.h / FreeRTOSConfig.h 等）
+├── linker/                              # 链接脚本
+├── startup/                             # 启动文件
+├── bsp/                                 # BSP 层：板级驱动
+│   ├── boards/alientek_explorer_v2.2/  # 板型配置
+│   └── components/                      # 驱动组件（lcd/nt35510, touch/gt9147, uart/uart_dbg）
+├── app/                                 # 应用层：模块化组织
+│   ├── core/                            # 应用核心（main.c）
+│   ├── tasks/                           # FreeRTOS 任务（freertos.c）
+│   ├── ui/                              # 用户界面（预留）
+│   └── ports/                           # 移植层（LVGL 接口）
+├── scripts/                             # 自动化脚本（构建、烧录、串口监控、内存分析）
+├── Inc/ Src/                            # CubeMX 生成代码（由 CubeMX 管理，勿手工改）
+├── Drivers/                             # HAL / CMSIS
 ├── Middlewares/                         # FreeRTOS / LwIP / LVGL
-├── cmake/                               # 工具链配置与源文件清单
-└── board/                               # 板级参考配置
+├── docs/                                # 文档（architecture.md / debug-loop.md / 改进路线图）
+└── cmake/                               # 工具链配置与源文件清单
 ```
+
+> 详细架构说明见 [`docs/architecture.md`](docs/architecture.md)
+> 改进路线图见 [`docs/structure-improvement-roadmap.md`](docs/structure-improvement-roadmap.md)
 
 ## 构建
 
 ```bash
+# 配置
 cmake --preset Debug
+
+# 编译
 cmake --build build/Debug
+
+# 或使用一键脚本（推荐）
+./scripts/build_and_flash.sh        # 编译 + 内存分析 + 烧录（可选）
 ```
 
 产物：`build/Debug/CubeMX_Config.elf`，可用 ST-Link 烧录。
+
+## 快速上手
+
+```bash
+# 1. 一键构建并烧录
+./scripts/build_and_flash.sh
+
+# 2. 监控串口输出
+./scripts/serial_monitor.sh
+
+# 详细脚本说明见 scripts/README.md
+```
 
 ## 当前进度
 
@@ -86,7 +118,7 @@ cmake --build build/Debug
       - **实测 IC 为 GT917S**（0x8140 读回 "917S"，寄存器兼容；官方例程 strcmp("9147") 在此批屏幕上同样匹配不到）
       - 串口已验证按下/抬起事件流与坐标连续性；滑动到进度条区域坐标停更已修复（`lv_bar` 事件未冒泡）
 - [x] LVGL 8.3.11 集成：源码 + `lv_conf.h` + 显示/输入 port（`lv_port_disp.c` / `lv_port_indev.c`）
-      - LVGL 内存池 128KB 与显示缓冲 96KB（双缓冲 480×50）置于外部 SRAM IS62WV51216（FSMC NE3，CubeMX 已配置）
+      - LVGL 内存池 128KB 与显示缓冲约 192KB（双缓冲，每个 480×100）置于外部 SRAM IS62WV51216（FSMC NE3，CubeMX 已配置）
       - 测试任务 `lvglTestTask`（8KB 栈）周期调度 `lv_task_handler`，界面含：进度条动画 / 按钮点击计数 / 触摸坐标实时显示 / 秒计数
       - **编译通过**（345 编译单元，FLASH 467KB / RAM 107KB @ -O0 Debug）
 - [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑

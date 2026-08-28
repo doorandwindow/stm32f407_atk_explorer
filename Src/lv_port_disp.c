@@ -3,15 +3,15 @@
   * @file    lv_port_disp.c
   * @brief   LVGL 显示驱动移植（探索者 TFTLCD 480x800 竖屏, NT35510）
   *
-  * 缓冲: 双缓冲 480x50, 位于外部 SRAM IS62WV51216 (0x68020000)
+  * 缓冲: 双缓冲 480x100, 位于外部 SRAM IS62WV51216 (0x68020000)
   *       LVGL 内存池占用 0x68000000 ~ 0x68020000 (128KB), 二者不重叠
   ******************************************************************************
   */
 #include "lvgl.h"
 #include "lcd.h"
 
-/* 部分刷新行数: 480 * 50 * 2B * 2(双缓冲) = 96KB 外部 SRAM */
-#define DISP_BUF_LINES   50
+/* 部分刷新行数: 双缓冲共约 192KB（每个缓冲区 480 * 100 * 2B） */
+#define DISP_BUF_LINES   100
 #define DISP_BUF_PIXELS  (LCD_W * DISP_BUF_LINES)
 
 #define EXT_SRAM_BUF_BASE  0x68020000UL

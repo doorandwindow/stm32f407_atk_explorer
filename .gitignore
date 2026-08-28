@@ -14,6 +14,9 @@ CubeMX_Config.ioc.bak-*
 .cache/
 .omo/
 
+# ===== Claude Code 个人权限配置 (含本机路径) =====
+.claude/settings.local.json
+
 # ===== 本地索引 =====
 .clangd
 

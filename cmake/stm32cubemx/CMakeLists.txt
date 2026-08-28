@@ -11,6 +11,16 @@ set(MX_Defines_Syms
 # STM32CubeMX generated include paths
 set(MX_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../config
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../bsp/boards/alientek_explorer_v2.2
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../bsp/components/lcd/nt35510
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../bsp/components/touch/gt9147
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../bsp/components/uart/uart_dbg
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/tasks
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/ports
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/Third_Party/LwIP/src/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Middlewares/Third_Party/LwIP/system
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32F4xx_HAL_Driver/Inc
@@ -37,9 +47,9 @@ set(MX_Include_Dirs
 
 # STM32CubeMX generated application sources
 set(MX_Application_Src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/core/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/gpio.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/freertos.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../app/tasks/freertos.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/dac.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/fsmc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/iwdg.c
@@ -56,7 +66,7 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/stm32f4xx_hal_timebase_tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/sysmem.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Src/syscalls.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f407xx.s
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../startup/startup_stm32f407xx.s
 )
 
 # STM32 HAL/LL Drivers

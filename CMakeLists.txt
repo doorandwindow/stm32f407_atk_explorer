@@ -44,12 +44,25 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    Src/lcd.c
-    Src/gt9147.c
-    Src/uart_dbg.c
-    Src/lv_port_disp.c
-    Src/lv_port_indev.c
+    # BSP layer - Board configuration
+    bsp/boards/alientek_explorer_v2.2/board.c
+
+    # BSP layer - Components
+    bsp/components/lcd/nt35510/lcd.c
+    bsp/components/touch/gt9147/gt9147.c
+    bsp/components/uart/uart_dbg/uart_dbg.c
+
+    # Application layer
+    app/ports/lv_port_disp.c
+    app/ports/lv_port_indev.c
+
+    # LVGL Demo
+    app/demos/demo_main.c
+    app/demos/demo_simple.c
+    app/demos/demo_basic.c
+    app/demos/demo_input.c
+    app/demos/demo_container.c
+    app/demos/demo_advanced.c
 )
 
 # LVGL 8.3.11 源码
@@ -60,9 +73,28 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${LVGL_SRC})
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined include paths
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    # Configuration files
+    ${CMAKE_CURRENT_SOURCE_DIR}/config
+
+    # BSP layer includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/boards/alientek_explorer_v2.2
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/lcd/nt35510
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/touch/gt9147
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/uart/uart_dbg
+
+    # Application layer includes
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/tasks
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/ports
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/demos
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/inc
+
+    # LVGL middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl
+
+    # Root (for backward compatibility during transition)
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Add project symbols (macros)

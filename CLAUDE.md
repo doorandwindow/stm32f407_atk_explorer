@@ -22,11 +22,29 @@ cmake --build build/Release     # Release 构建（-Os）
 
 ## 架构
 
+### 目录结构（已于 2026-08-28 重构为专业化分层）
+
+```
+stm32f407/
+├── config/          # 配置文件（lv_conf.h / FreeRTOSConfig.h / lwipopts.h / stm32f4xx_hal_conf.h）
+├── linker/          # 链接脚本（STM32F407xx_FLASH.ld）
+├── startup/         # 启动文件（startup_stm32f407xx.s）
+├── bsp/             # BSP 层：板级驱动（lcd.c / gt9147.c / uart_dbg.c）
+├── app/             # 应用层：main.c / freertos.c / lv_port_*.c
+├── Inc/ Src/        # CubeMX 生成代码（由 CubeMX 管理，用户代码只写在 USER CODE 区）
+├── Drivers/         # ST 官方库（HAL / CMSIS）
+├── Middlewares/     # 中间件（FreeRTOS / LwIP / LVGL）
+└── docs/            # 文档（architecture.md / debug-loop.md）
+```
+
+> **完整架构说明见 `docs/architecture.md`**
+
 ### CubeMX 生成代码的边界（重要）
 
 - `CubeMX_Config.ioc` 是硬件配置的唯一真源（引脚/时钟/外设/FreeRTOS/LwIP）。
-- `cmake/stm32cubemx/CMakeLists.txt` 与 `Src/`、`Inc/` 中带 `/* USER CODE BEGIN/END */` 标记的文件由 CubeMX 重新生成时覆盖。**用户代码只写在 USER CODE 区内**；写在生成区里的手工修改会在重新生成时丢失（实例：`Src/iwdg.c` 的 IWDG 预分频 /16 是手工改的，注释已标明会被还原）。
-- **新增源文件/头文件路径改根目录 `CMakeLists.txt`**（`target_sources` / `target_include_directories`），不要改 `cmake/stm32cubemx/`。LVGL 源码用 `file(GLOB_RECURSE)` 收集，`lv_conf.h` 在仓库根目录（宏 `LV_CONF_INCLUDE_SIMPLE`）。
+- `Inc/` 和 `Src/` 中 CubeMX 生成的文件会在重新生成时覆盖。**用户代码只写在 USER CODE 区内**；写在生成区里的手工修改会在重新生成时丢失。
+- **`app/src/main.c` 和 `app/src/freertos.c` 已迁移**：这两个文件是从 `Src/` 复制过来的，包含 USER CODE 区。CubeMX 重新生成时会在 `Src/` 重新创建它们，需手工合并 USER CODE 区的改动。
+- **新增源文件/头文件路径改根目录 `CMakeLists.txt`**，不要改 `cmake/stm32cubemx/`。LVGL 源码用 `file(GLOB_RECURSE)` 收集，`lv_conf.h` 现在在 `config/` 目录（宏 `LV_CONF_INCLUDE_SIMPLE`）。
 
 ### 启动与任务流
 
