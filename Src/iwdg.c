@@ -38,7 +38,9 @@ void MX_IWDG_Init(void)
 
   /* USER CODE END IWDG_Init 1 */
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
+  /* 注意: 默认 /4+4095 = 0.5s 超时太短, LVGL 首次渲染(~0.9s)会被看门狗复位。
+     改为 /16 = 2.05s (CubeMX 重新生成会还原, 见 README) */
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
   hiwdg.Init.Reload = 4095;
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {

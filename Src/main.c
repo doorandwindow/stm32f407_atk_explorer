@@ -33,7 +33,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "uart_dbg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,7 +77,17 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  /* 诊断: 进 main 即点亮 LED0(PF9), 证明系统从 Flash 启动成功 */
+  __HAL_RCC_GPIOF_CLK_ENABLE();
+  {
+    GPIO_InitTypeDef gpio_led = {0};
+    gpio_led.Pin = GPIO_PIN_9;
+    gpio_led.Mode = GPIO_MODE_OUTPUT_PP;
+    gpio_led.Pull = GPIO_NOPULL;
+    gpio_led.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOF, &gpio_led);
+    HAL_GPIO_WritePin(GPIOF, GPIO_PIN_9, GPIO_PIN_SET);
+  }
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -101,12 +111,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_SPI1_Init();
   MX_USART3_UART_Init();
-  MX_RTC_Init();
+  // MX_RTC_Init();       /* [诊断] LSE 起振失败会 Error_Handler, 临时注释 */
   MX_IWDG_Init();
   MX_TIM14_Init();
   MX_TIM13_Init();
   MX_TIM11_Init();
-  MX_SDIO_SD_Init();
+  // MX_SDIO_SD_Init();   /* [诊断] 无 SD 卡时可能 Error_Handler 卡死, 临时注释 */
   MX_TIM2_Init();
   MX_SPI2_Init();
   MX_TIM4_Init();
@@ -114,7 +124,28 @@ int main(void)
   MX_FSMC_Init();
   MX_DAC_Init();
   /* USER CODE BEGIN 2 */
-
+  /* 诊断: 进 main 即点亮 LCD 背光(PB15), 验证系统是否活着 + 区分背光/任务问题 */
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  {
+    GPIO_InitTypeDef gpio_bl = {0};
+    gpio_bl.Pin = GPIO_PIN_15;
+    gpio_bl.Mode = GPIO_MODE_OUTPUT_PP;
+    gpio_bl.Pull = GPIO_NOPULL;
+    gpio_bl.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOB, &gpio_bl);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
+  }
+  /* 诊断: 打印复位源 (RCC_CSR), 区分 IWDG/WWDG/软件/引脚/欠压复位 */
+  {
+    uint32_t csr = RCC->CSR;
+    dbg_printf("[dbg] RST cause 0x%08X: %s%s%s%s%s\r\n", (unsigned int)csr,
+               (csr & RCC_CSR_IWDGRSTF) ? "IWDG " : "",
+               (csr & RCC_CSR_WWDGRSTF) ? "WWDG " : "",
+               (csr & RCC_CSR_SFTRSTF)  ? "SW   " : "",
+               (csr & RCC_CSR_PINRSTF)  ? "PIN  " : "",
+               (csr & RCC_CSR_PORRSTF)  ? "POR  " : "");
+    __HAL_RCC_CLEAR_RESET_FLAGS();
+  }
   /* USER CODE END 2 */
 
   /* Init scheduler */

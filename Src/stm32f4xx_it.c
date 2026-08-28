@@ -89,7 +89,33 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  /* 诊断: 抓现场 (PC/LR) + 故障寄存器, 对照 .map 反查 INVPC 函数 */
+  extern void dbg_printf(const char *fmt, ...);
+  uint32_t sp_val;
+  __asm volatile (
+      "tst lr, #4 \n"
+      "ite eq \n"
+      "mrseq r0, msp \n"
+      "mrsne r0, psp \n"
+      "mov %0, r0 \n"
+      : "=r"(sp_val)
+      :
+      : "r0"
+  );
+  uint32_t pc = ((volatile uint32_t *)sp_val)[1];   /* PC 异常栈帧偏移 4  */
+  uint32_t lr = ((volatile uint32_t *)sp_val)[2];   /* LR 异常栈帧偏移 8  */
+  uint32_t xpsr = ((volatile uint32_t *)sp_val)[0];  /* xPSR */
+  uint32_t r12  = ((volatile uint32_t *)sp_val)[3];
+  uint32_t r3   = ((volatile uint32_t *)sp_val)[4];
+  uint32_t r2   = ((volatile uint32_t *)sp_val)[5];
+  uint32_t r1   = ((volatile uint32_t *)sp_val)[6];
+  uint32_t r0   = ((volatile uint32_t *)sp_val)[7];
+  dbg_printf("[dbg] HF! SP=0x%08X PC=0x%08X LR=0x%08X xPSR=0x%08X\r\n",
+             (unsigned int)sp_val, (unsigned int)pc, (unsigned int)lr, (unsigned int)xpsr);
+  dbg_printf("[dbg] HF! R0=0x%08X R1=0x%08X R2=0x%08X R3=0x%08X R12=0x%08X\r\n",
+             (unsigned int)r0, (unsigned int)r1, (unsigned int)r2, (unsigned int)r3, (unsigned int)r12);
+  dbg_printf("[dbg] HF! HFSR=0x%08X CFSR=0x%08X BFAR=0x%08X\r\n",
+             (unsigned int)SCB->HFSR, (unsigned int)SCB->CFSR, (unsigned int)SCB->BFAR);
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {

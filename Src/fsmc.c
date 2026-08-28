@@ -75,7 +75,17 @@ void MX_FSMC_Init(void)
   }
 
   /* USER CODE BEGIN FSMC_Init 2 */
-
+  /* 优化外部 SRAM 时序: CubeMX 默认 DataSetup=255 太慢(~1.5us/次),
+     LVGL 渲染大量访问 SRAM 会卡住看门狗。IS62WV51216 规格 55ns, 收紧到安全值。
+     注意: BTCR[] 为 BCR/BTR 交替排列, BTCR[5] = BTR3(时序), BTCR[4] = BCR3(控制) */
+  {
+    uint32_t btr = FSMC_Bank1->BTCR[5];   /* BTR3: 读时序寄存器 */
+    btr &= ~(FSMC_BTR3_ADDSET_Msk | FSMC_BTR3_ADDHLD_Msk | FSMC_BTR3_DATAST_Msk);
+    btr |= (5U  << FSMC_BTR3_ADDSET_Pos)   /* 地址建立 5 HCLK */
+         | (1U  << FSMC_BTR3_ADDHLD_Pos)   /* 地址保持 1 HCLK */
+         | (10U << FSMC_BTR3_DATAST_Pos);  /* 数据建立 10 HCLK (60ns) */
+    FSMC_Bank1->BTCR[5] = btr;
+  }
   /* USER CODE END FSMC_Init 2 */
 }
 
