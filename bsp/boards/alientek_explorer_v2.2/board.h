@@ -75,6 +75,24 @@ extern "C" {
 #define BOARD_LED1_GPIO         GPIOF
 #define BOARD_LED1_PIN          GPIO_PIN_10
 
+/* 板载 LED 为低电平点亮 (GPIO_ACTIVE_LOW, 参考探索者原理图/常用例程):
+   写 BOARD_LED_ACTIVE_LEVEL(0) -> 亮, 写 BOARD_LED_INACTIVE_LEVEL(1) -> 灭 */
+#define BOARD_LED_ACTIVE_LEVEL    GPIO_PIN_RESET
+#define BOARD_LED_INACTIVE_LEVEL  GPIO_PIN_SET
+
+/* ============================================================================
+   按键 (KEY) 配置
+   ========================================================================= */
+/* KEY0: 按下接到 GND (低有效), 松开经上拉回高; 需配置为输入 + 内部上拉 */
+#define BOARD_KEY0_GPIO         GPIOE
+#define BOARD_KEY0_PIN          GPIO_PIN_4
+#define BOARD_KEY0_PRESS_LEVEL  GPIO_PIN_RESET   /* 按下时为低电平 */
+
+/* KEY1: 同样低有效, 内部上拉; 用于"长按调节 LED1(PF10) 亮度" */
+#define BOARD_KEY1_GPIO         GPIOE
+#define BOARD_KEY1_PIN          GPIO_PIN_3
+#define BOARD_KEY1_PRESS_LEVEL  GPIO_PIN_RESET   /* 按下时为低电平 */
+
 /* ============================================================================
    外部 SRAM 配置
    ========================================================================= */

@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     bsp/components/lcd/nt35510/lcd.c
     bsp/components/touch/gt9147/gt9147.c
     bsp/components/uart/uart_dbg/uart_dbg.c
+    bsp/components/led/led_pwm.c
 
     # Application layer
     app/ports/lv_port_disp.c
@@ -66,7 +67,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # LVGL 8.3.11 源码
-file(GLOB_RECURSE LVGL_SRC CONFIGURE_DEPENDS
+# 说明: 不用 CONFIGURE_DEPENDS —— 它会触发 ninja 构建期"Re-checking globbed directories"子进程
+# (CMakeVerifyGlobs), 在本机沙箱下会死锁/夯死。改为在新增源码后手动 cmake --preset Debug 重新配置。
+file(GLOB_RECURSE LVGL_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl/src/*.c
 )
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${LVGL_SRC})
@@ -81,6 +84,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/lcd/nt35510
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/touch/gt9147
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/uart/uart_dbg
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/led
 
     # Application layer includes
     ${CMAKE_CURRENT_SOURCE_DIR}/app/core

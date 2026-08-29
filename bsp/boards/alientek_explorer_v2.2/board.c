@@ -20,13 +20,14 @@ void Board_Init(void)
 /**
  * @brief  点亮 LED
  * @param  led: LED 编号（0 或 1）
+ * @note   板载 LED 低电平点亮, 写 BOARD_LED_ACTIVE_LEVEL 即"亮"
  */
 void Board_LED_On(uint8_t led)
 {
     if (led == 0) {
-        HAL_GPIO_WritePin(BOARD_LED0_GPIO, BOARD_LED0_PIN, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(BOARD_LED0_GPIO, BOARD_LED0_PIN, BOARD_LED_ACTIVE_LEVEL);
     } else if (led == 1) {
-        HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN, BOARD_LED_ACTIVE_LEVEL);
     }
 }
 
@@ -37,9 +38,9 @@ void Board_LED_On(uint8_t led)
 void Board_LED_Off(uint8_t led)
 {
     if (led == 0) {
-        HAL_GPIO_WritePin(BOARD_LED0_GPIO, BOARD_LED0_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(BOARD_LED0_GPIO, BOARD_LED0_PIN, BOARD_LED_INACTIVE_LEVEL);
     } else if (led == 1) {
-        HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN, BOARD_LED_INACTIVE_LEVEL);
     }
 }
 

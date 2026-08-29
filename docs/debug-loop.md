@@ -35,6 +35,21 @@
 [dbg] alive N s ...
 ```
 
+按键控制 LED 任务 (keyLedTask) 追加输出 (2026-08-29 新增, 已上板验证):
+```
+[key] keyLedTask started, KEY0=PE4 LED1=PF10 (active-low)
+[key] KEY0 press -> LED1 ON      (按 KEY0(PE4) 时出现, 严格 ON/OFF 交替, 消抖 20ms)
+```
+
+长按调光任务 (keyBrightTask) 输出 (2026-08-29 新增, 已上板验证; 亮度的 LED 对换方案):
+```
+[bright] keyBrightTask started, KEY1=PE3 LED0=PF9 (HW-PWM, 1000 levels)
+[bright] KEY1 hold -> start ramping
+[bright] duty 5%               (按住后每跨 5% 打印一次; 0%->100%->0% 往返)
+[bright] KEY1 release, duty=NN%
+[bright] KEY1 tap(short) -> no change   (按住 <400ms, 不调光)
+```
+
 ## 已知坑 / 风险点
 
 1. **IWDG 超时约 2s** (LSI 32kHz /16, Reload 4095; Prescaler/Reload 已回写 `CubeMX_Config.ioc`, 重新生成不会再回退 /4≈0.5s)

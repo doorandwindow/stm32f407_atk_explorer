@@ -121,6 +121,16 @@ cmake --build build/Debug
       - LVGL 内存池 128KB 与显示缓冲约 192KB（双缓冲，每个 480×100）置于外部 SRAM IS62WV51216（FSMC NE3，CubeMX 已配置）
       - 测试任务 `lvglTestTask`（8KB 栈）周期调度 `lv_task_handler`，界面含：进度条动画 / 按钮点击计数 / 触摸坐标实时显示 / 秒计数
       - **编译通过**（345 编译单元，FLASH 467KB / RAM 107KB @ -O0 Debug）
+- [x] 业务功能：任务 `keyLedTask`（按键控制 LED）—— **已上板验证**（2026-08-29 与调光任务对换 LED 后）
+      - KEY0(PE4, 低有效/内部上拉) 按下翻转 LED1(PF10, 低电平点亮)；20ms 消抖 + 松开检测防重复触发
+      - 每次有效按下串口打印 `[key] KEY0 press -> LED1 ON/OFF`（实测严格交替，无误触发）
+      - 引脚定义在 `bsp/boards/alientek_explorer_v2.2/board.h`（KEY0/KEY1 + LED 电平宏）
+- [x] 业务功能：任务 `keyBrightTask`（长按调节 LED 亮度）—— **已上板验证**
+      - KEY1(PE3, 低有效/内部上拉) 长按(≥400ms) 调节 LED0(PF9) 亮度；0%→100%→0% 往返，20ms/级
+      - 亮度用 TIM14_CH1 硬件 PWM（PF9 是板上唯一硬件 PWM 引脚；1kHz / 1000 级 / 无中断）。早期版本亮度落在
+        PF10（无硬件 PWM）故用 TIM13 软 PWM，LED 对换后已废弃
+      - 串口打印 `[bright] KEY1 hold -> start ramping` / `duty NN%` / `release`；按住不足 400ms 为短按无动作
+      - 模块在 `bsp/components/led/led_pwm.{c,h}`；对换后两任务占用 PF9(PWM)/PF10(GPIO)，互不干扰
 - [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑
       `MX_LWIP_Init()`（实测调用链 ~300B），栈溢出踩坏调度器结构 → INVPC HardFault → IWDG 复位。
       栈扩至 2KB，二分双向验证（512B 必死 / 2KB 稳定）。现串口心跳正常；屏幕显示内容与触摸坐标
