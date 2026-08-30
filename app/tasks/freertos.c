@@ -97,12 +97,21 @@ const osThreadAttr_t dashboardTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
+/* Definitions for monitorTask (系统状态监控任务) */
+osThreadId_t monitorTaskHandle;
+const osThreadAttr_t monitorTask_attributes = {
+  .name = "monitorTask",
+  .stack_size = 512 * 4,   /* 2KB: vTaskGetInfo + dbg_printf(vsnprintf ~160B); 堆吃紧(40KB-30KB)从轻 */
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void StartLvglTestTask(void *argument);
 void StartKeyLedTask(void *argument);
 void StartKeyBrightTask(void *argument);
 void StartDashboardTask(void *argument);
+void StartMonitorTask(void *argument);
 extern void lv_port_disp_init(void);
 extern void lv_port_disp_get_stats(uint32_t *count, uint32_t *pixels);
 extern void lv_port_indev_init(void);
@@ -150,6 +159,7 @@ void MX_FREERTOS_Init(void) {
   keyLedTaskHandle = osThreadNew(StartKeyLedTask, NULL, &keyLedTask_attributes);
   keyBrightTaskHandle = osThreadNew(StartKeyBrightTask, NULL, &keyBrightTask_attributes);
   dashboardTaskHandle = osThreadNew(StartDashboardTask, NULL, &dashboardTask_attributes);
+  monitorTaskHandle = osThreadNew(StartMonitorTask, NULL, &monitorTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */

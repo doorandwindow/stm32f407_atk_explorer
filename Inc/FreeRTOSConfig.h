@@ -169,6 +169,17 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+
+/* [诊断] run-time stats 统计时钟: TIM11 1MHz 自由计数 (bsp/components/rtstats/),
+   供 monitor_task 计算整机 CPU 占用率。CubeMX 重新生成本文件会丢失, 需重新添加。
+   注意: config/ 与 Inc/ 两份 FreeRTOSConfig.h 必须同步修改 —— configGENERATE_RUN_TIME_STATS
+   影响 TCB/TaskStatus_t 字段布局, 两份不一致会导致不同编译单元间踩内存 */
+#define configGENERATE_RUN_TIME_STATS           1
+#define INCLUDE_xTaskGetIdleTaskHandle          1
+extern void rtstats_rtclock_init(void);
+extern uint32_t rtstats_rtclock_get(void);
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()  rtstats_rtclock_init()
+#define portGET_RUN_TIME_COUNTER_VALUE()          rtstats_rtclock_get()
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

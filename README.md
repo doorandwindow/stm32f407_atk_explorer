@@ -140,6 +140,14 @@ cmake --build build/Debug
       - FreeRTOS 堆 32KB→40KB(0xA000)：5 任务栈 30KB+TCB 超 32KB 曾致任务创建失败→IWDG 复位，已修复
       - ⚠ 未联网端到端验证：板载网卡需接有 DHCP 的局域网、板与 PC 同网段、`AIDASH_PROXY_IP` 指到 PC 真实 IP、
         并 `DEEPSEEK_API_KEY` 才能拉到真实数据；无网时稳定等待不崩（已上板验证）。本机网络为虚拟网卡，仅验证到"稳定+屏显示+等DHCP"
+- [x] 诊断功能：任务 `monitorTask`（每 1s 打印系统状态）—— **已上板验证**
+      - 串口输出 `[mon] cpu x.x% | heap total/used/free/peak_used/min_free`：堆已用/未用来自 heap_4 的
+        `xPortGetFreeHeapSize`；历史峰值使用与最小剩余由 `xPortGetMinimumEverFreeHeapSize` 天然记录
+      - CPU 占用率：启用 `configGENERATE_RUN_TIME_STATS`，统计时钟用闲置 TIM11（1MHz 自由计数，16 位溢出中断
+        虚拟化成 32 位，见 `bsp/components/rtstats/`），忙占比 = 100% − 空闲任务运行占比，0.1% 整数精度
+      - 实测：开机首窗 40.4%（LVGL 初始化突发）→ 稳态 ~5.8%；堆余量 4.2KB；任务栈 2KB、优先级 BelowNormal
+      - ⚠ `config/` 与 `Inc/` 两份 FreeRTOSConfig.h 必须同步修改（影响 TCB 布局，不一致会踩内存）；
+        CubeMX 重新生成会丢宏，需重加（同栈溢出检测宏约定）
 - [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑
       `MX_LWIP_Init()`（实测调用链 ~300B），栈溢出踩坏调度器结构 → INVPC HardFault → IWDG 复位。
       栈扩至 2KB，二分双向验证（512B 必死 / 2KB 稳定）。现串口心跳正常；屏幕显示内容与触摸坐标

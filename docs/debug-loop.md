@@ -59,6 +59,14 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
 [dash] connect fail/timeout to ip:port                                      (代理不可达/不同网段)
 ```
 
+系统状态监控任务 (2026-08-30 新增, 已上板验证):
+```
+[mon] monitorTask started, period 1000ms
+[mon] cpu 5.8% | heap total 40960 used 36744 free 4216 peak_used 36744 min_free 4216
+      每 1s 一行; cpu=整机忙占比(开机首窗偏高属 LVGL 初始化突发, 稳态 ~5-6%)
+      peak_used/min_free 是开机以来历史极值, used/heap 顶穿 40960 会在创建任务时触发 [HOOK] 复位
+```
+
 ## 已知坑 / 风险点
 
 1. **IWDG 超时约 2s** (LSI 32kHz /16, Reload 4095; Prescaler/Reload 已回写 `CubeMX_Config.ioc`, 重新生成不会再回退 /4≈0.5s)
