@@ -1,7 +1,7 @@
 /**
  ******************************************************************************
  * @file    monitor_task.c
- * @brief   系统状态监控任务 (1s 周期打印内存 + CPU 占用率)
+ * @brief   系统状态监控任务 (10s 周期打印内存 + CPU 占用率)
  * @note    内存: heap_4 的 xPortGetFreeHeapSize / xPortGetMinimumEverFreeHeapSize。
  *          "峰值使用 = 总量 - 历史最小剩余" 由内核天然记录, 无需额外账本。
  *          CPU: 依赖 configGENERATE_RUN_TIME_STATS (TIM11 1MHz 统计时钟, 见
@@ -20,7 +20,7 @@
 #include "uart_dbg.h"
 
 /* ---- 打印周期 ---- */
-#define MONITOR_PERIOD_MS   1000U
+#define MONITOR_PERIOD_MS   10000U
 
 /**
  * @brief  系统状态监控任务

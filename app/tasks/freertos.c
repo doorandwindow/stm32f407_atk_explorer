@@ -113,7 +113,6 @@ void StartKeyBrightTask(void *argument);
 void StartDashboardTask(void *argument);
 void StartMonitorTask(void *argument);
 extern void lv_port_disp_init(void);
-extern void lv_port_disp_get_stats(uint32_t *count, uint32_t *pixels);
 extern void lv_port_indev_init(void);
 extern void demo_advanced_update(void);
 /* USER CODE END FunctionPrototypes */
@@ -227,10 +226,10 @@ void StartLvglTestTask(void *argument)
   // demo_create_simple();  /* 极简版，测试是否是 UI 复杂度问题 */
 
   /* ---- 周期调度 ---- */
-  uint32_t alive_cnt = 0;
+  /* [dbg] alive / [perf] 每秒打印已移除 (2026-08-30 串口降噪): 系统活性由
+     [mon] 10s 一行 + IWDG 兜底证明, LVGL 卡死会停喂狗触发复位; perf 统计
+     (lvgl_max/flush/pixels) 需要时从 git 历史找回 */
   uint32_t last_tick = HAL_GetTick();
-  uint32_t perf_last_tick = last_tick;
-  uint32_t max_handler_ms = 0;
   for (;;)
   {
     HAL_IWDG_Refresh(&hiwdg);   /* 喂狗: IWDG 超时 ~2s (LSI 32kHz/16, Reload 4095) */
@@ -238,31 +237,10 @@ void StartLvglTestTask(void *argument)
     lv_tick_inc(now - last_tick);
     last_tick = now;
 
-    if (++alive_cnt % 200 == 0)   /* 5ms x 200 = 1s, 证明循环在跑 */
-    {
-      dbg_printf("[dbg] alive %lu s\r\n", (unsigned long)(alive_cnt / 200));
-    }
-
     /* 更新当前屏（仪表盘数据，或 demo 屏动画） */
     dashboard_screen_update();
 
-    uint32_t handler_start = HAL_GetTick();
     lv_task_handler();   /* LVGL 任务调度 */
-    uint32_t handler_ms = HAL_GetTick() - handler_start;
-    if (handler_ms > max_handler_ms) max_handler_ms = handler_ms;
-
-    if ((uint32_t)(HAL_GetTick() - perf_last_tick) >= 1000U)
-    {
-      uint32_t flush_count;
-      uint32_t flush_pixels;
-      lv_port_disp_get_stats(&flush_count, &flush_pixels);
-      dbg_printf("[perf] lvgl_max=%lums flush=%lu pixels=%lu\r\n",
-                 (unsigned long)max_handler_ms,
-                 (unsigned long)flush_count,
-                 (unsigned long)flush_pixels);
-      max_handler_ms = 0;
-      perf_last_tick = HAL_GetTick();
-    }
     osDelay(5);
   }
 }

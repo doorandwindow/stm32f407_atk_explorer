@@ -32,8 +32,10 @@
 [dbg] GT9147 CTP ID: 917S
 [dbg] GT9147 OK
 [dbg] LVGL ready
-[dbg] alive N s ...
 ```
+
+串口周期输出只剩两类 (2026-08-30 降噪后): `[mon]` 每 10s 一行 + `[dash]` 每 30s 一行。
+`[dbg] alive` 与 `[perf]` 每秒打印已移除 (活性由 [mon] + IWDG 兜底证明, perf 统计从 git 历史找回)。
 
 按键控制 LED 任务 (keyLedTask) 追加输出 (2026-08-29 新增, 已上板验证):
 ```
@@ -59,11 +61,11 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
 [dash] connect fail/timeout to ip:port                                      (代理不可达/不同网段)
 ```
 
-系统状态监控任务 (2026-08-30 新增, 已上板验证):
+系统状态监控任务 (2026-08-30 新增, 已上板验证; 同日起周期 1s→10s 降噪):
 ```
-[mon] monitorTask started, period 1000ms
+[mon] monitorTask started, period 10000ms
 [mon] cpu 5.8% | heap total 40960 used 36744 free 4216 peak_used 36744 min_free 4216
-      每 1s 一行; cpu=整机忙占比(开机首窗偏高属 LVGL 初始化突发, 稳态 ~5-6%)
+      每 10s 一行; cpu=整机忙占比(开机首窗偏高属 LVGL 初始化突发, 稳态 ~5%)
       peak_used/min_free 是开机以来历史极值, used/heap 顶穿 40960 会在创建任务时触发 [HOOK] 复位
 ```
 
