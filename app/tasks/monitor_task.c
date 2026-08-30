@@ -39,9 +39,12 @@ extern uint32_t _ebss;      /* .bss 结束(静态占用 = data+bss, 含 40KB Fre
 
 extern uint32_t lv_port_disp_buf_bytes(void);   /* CCM 渲染单缓冲字节数 */
 
-/* 任务句柄(定义在 app/tasks/freertos.c): 逐任务栈水位用 */
+/* 任务句柄(定义在 app/tasks/freertos.c 与 app/smart/): 逐任务栈水位用 */
 extern osThreadId_t defaultTaskHandle;
 extern osThreadId_t monitorTaskHandle;
+extern osThreadId_t smartTickHandle;
+extern osThreadId_t smartPeriodicHandle;
+extern osThreadId_t smartAlarmHandle;
 
 /**
  * @brief  字节 -> 0.1KB 定点数(四舍五入), 打印时拆成 x.y
@@ -157,13 +160,17 @@ void StartMonitorTask(void *argument)
        高水位 = 栈创建后从未被写过的最小剩余。timer 服务任务栈固定 256 字,
        未列入(取其句柄需 INCLUDE_xTimerGetTimerDaemonTaskHandle, 暂不开) */
     {
-      const char *stk_names[3] = { "default", "monitor", "idle" };
-      TaskHandle_t stk_hs[3];
+      const char *stk_names[6] = { "default", "monitor", "tick",
+                                   "periodic", "alarm", "idle" };
+      TaskHandle_t stk_hs[6];
       stk_hs[0] = defaultTaskHandle;
       stk_hs[1] = monitorTaskHandle;
-      stk_hs[2] = xTaskGetIdleTaskHandle();
+      stk_hs[2] = smartTickHandle;
+      stk_hs[3] = smartPeriodicHandle;
+      stk_hs[4] = smartAlarmHandle;
+      stk_hs[5] = xTaskGetIdleTaskHandle();
       dbg_printf("[mon] stk(b)");
-      for (unsigned si = 0U; si < 3U; si++)
+      for (unsigned si = 0U; si < 6U; si++)
       {
         if (stk_hs[si] != NULL)
         {

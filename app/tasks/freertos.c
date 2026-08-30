@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 #include "uart_dbg.h"
 #include "iwdg.h"
+#include "smart_tasks.h"
+#include "smart_data.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -86,7 +88,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  smart_data_init();   /* small_smart 共享数据模型清零置初值 (任务创建前) */
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -111,6 +113,10 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  /* small_smart 移植任务 (P3 骨架, 硬件桩): 节拍 -> 控制状态机 -> 报警巡检 */
+  smartTickHandle = osThreadNew(StartSmartTickTask, NULL, &smartTick_attributes);
+  smartPeriodicHandle = osThreadNew(StartSmartPeriodicTask, NULL, &smartPeriodic_attributes);
+  smartAlarmHandle = osThreadNew(StartSmartAlarmTask, NULL, &smartAlarm_attributes);
   monitorTaskHandle = osThreadNew(StartMonitorTask, NULL, &monitorTask_attributes);
   /* USER CODE END RTOS_THREADS */
 

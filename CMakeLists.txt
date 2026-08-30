@@ -59,6 +59,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
     # Application tasks
     app/tasks/monitor_task.c
+
+    # small_smart 移植 (app/smart)
+    app/smart/smart_data.c
+    app/smart/smart_sim.c
+    app/smart/smart_tick_task.c
+    app/smart/smart_periodic_task.c
+    app/smart/smart_alarm_task.c
 )
 
 # LVGL 8.3.11 源码
@@ -85,6 +92,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/app/core
     ${CMAKE_CURRENT_SOURCE_DIR}/app/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ports
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/smart
 
     # LVGL middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl
