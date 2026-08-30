@@ -66,7 +66,7 @@ void StartMonitorTask(void *argument)
     uint32_t heap_free     = (uint32_t)xPortGetFreeHeapSize();
     uint32_t heap_min_free = (uint32_t)xPortGetMinimumEverFreeHeapSize();
 
-    dbg_printf("[mon] cpu %u.%u%% | heap total %u used %u free %u peak_used %u min_free %u\r\n",
+    dbg_printf("[mon] cpu %u.%u%% | heap(bytes) total %u used %u free %u peak_used %u min_free %u\r\n",
                (unsigned)(busy_pm / 10U), (unsigned)(busy_pm % 10U),
                (unsigned)heap_total,
                (unsigned)(heap_total - heap_free),
