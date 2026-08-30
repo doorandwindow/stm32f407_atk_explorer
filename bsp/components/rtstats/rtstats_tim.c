@@ -58,7 +58,7 @@ void rtstats_rtclock_init(void)
  */
 uint32_t rtstats_rtclock_get(void)
 {
-  uint32_t high1, high2, cnt;
+  uint32_t high1, high2, cnt, virt;
 
   do
   {
@@ -67,7 +67,17 @@ uint32_t rtstats_rtclock_get(void)
     high2 = s_overflow;
   } while (high1 != high2);
 
-  return (high1 << 16) | cnt;
+  virt = (high1 << 16) | cnt;
+  /* 回卷窗口补偿: CNT 已回卷但溢出 ISR 尚未执行(UIF 挂起, ISR 优先级 15 会被
+     BASEPRI 屏蔽延迟)时, 裸读会倒退最多 65.5ms, 内核据此算任务运行差值将下溢,
+     [mon] cpu 表现为 42936.6% 一类荒谬值(2026-08-30 P2 上板实测)。补 1 个高位后
+     与 ISR 随后的累加一致, 时钟保持单调。cnt>=0x8000 时不补偿: 那是被屏蔽 >65ms
+     的多重回卷, 只欠不计(时钟偏慢), 不会倒退。 */
+  if ((__HAL_TIM_GET_FLAG(&htim11, TIM_FLAG_UPDATE) != RESET) && (cnt < 0x8000U))
+  {
+    virt += 0x10000U;
+  }
+  return virt;
 }
 
 /**

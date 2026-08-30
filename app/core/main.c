@@ -21,7 +21,7 @@
 #include "cmsis_os.h"
 #include "dac.h"
 #include "iwdg.h"
-#include "lwip.h"
+/* P2 拔除 ETH (2026-08-30): #include "lwip.h" 已移除, 恢复时与 cmake/stm32cubemx 一起回补 */
 #include "rtc.h"
 #include "sdio.h"
 #include "spi.h"

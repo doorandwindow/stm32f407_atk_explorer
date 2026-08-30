@@ -55,8 +55,9 @@
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 512 * 4,   /* 2KB: 任务里跑 MX_LWIP_Init(), 调用链 ~300B; 512B 会栈溢出踩坏 TCB →
-                              调度器恢复坏上下文 → INVPC HardFault → IWDG 复位循环 (2026-08-27 二分已证实) */
+  .stack_size = 256 * 4,   /* 1KB: P2 拔除 LwIP 后本任务只剩喂狗循环(实测峰值 ~100B 量级);
+                              旧值 2KB 因当时跑 MX_LWIP_Init(); 512B 溢出是 LwIP 调用链所致,
+                              LwIP 已移除, 1KB 留足余量, 水位见 [mon] stk(b) 行 */
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -74,9 +75,9 @@ void StartMonitorTask(void *argument);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
-
-extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
+/* Private application code --------------------------------------------------*/
 
 /**
   * @brief  FreeRTOS initialization
@@ -128,8 +129,7 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-  /* init code for LWIP */
-  MX_LWIP_Init();
+  /* P2 (2026-08-30): MX_LWIP_Init() 已随 LwIP+ETH 拔除移除, 本任务现为纯看门狗守护 */
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
   for(;;)

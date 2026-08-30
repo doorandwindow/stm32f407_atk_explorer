@@ -55,7 +55,9 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern ETH_HandleTypeDef heth;
+/* P2 拔除 ETH (2026-08-30): heth 定义于 Src/ethernetif.c(已出构建), 恢复时连同
+   cmake/stm32cubemx 与两份 hal_conf 的 HAL_ETH_MODULE_ENABLED 一起恢复 */
+/* extern ETH_HandleTypeDef heth; */
 extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart1;
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -231,6 +233,9 @@ void TIM7_IRQHandler(void)
   /* USER CODE END TIM7_IRQn 1 */
 }
 
+/* P2 拔除 ETH (2026-08-30): ETH_IRQn 已在 ioc 中断表禁用意义不大, 处理器本体
+   随 HAL_ETH 模块一起摘除, 避免引用已出构建的 heth/HAL_ETH_IRQHandler */
+#if 0
 /**
   * @brief This function handles Ethernet global interrupt.
   */
@@ -244,6 +249,7 @@ void ETH_IRQHandler(void)
 
   /* USER CODE END ETH_IRQn 1 */
 }
+#endif /* 0: ETH 拔除, 恢复见文件头注释 */
 
 /**
   * @brief This function handles USB On The Go FS global interrupt.

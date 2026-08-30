@@ -45,7 +45,8 @@
 #define HAL_DAC_MODULE_ENABLED
 /* #define HAL_DCMI_MODULE_ENABLED */
 /* #define HAL_DMA2D_MODULE_ENABLED */
-#define HAL_ETH_MODULE_ENABLED
+/* P2 拔除 ETH (2026-08-30): 模块随 LwIP 一起出构建, 恢复见 cmake/stm32cubemx 注释 */
+/* #define HAL_ETH_MODULE_ENABLED */
 /* #define HAL_ETH_LEGACY_MODULE_ENABLED */
 /* #define HAL_NAND_MODULE_ENABLED */
 /* #define HAL_NOR_MODULE_ENABLED */
