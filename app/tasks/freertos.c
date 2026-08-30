@@ -25,16 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "lcd.h"
-#include "gt9147.h"
-#include "lvgl.h"
 #include "uart_dbg.h"
 #include "iwdg.h"
-#include "demo_main.h"
-#include "board.h"
-#include "led_pwm.h"
-#include "dashboard_screen.h"
-#include "ai_dash_api.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,46 +46,17 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+/* 2026-08-30 P1 清场: keyLed/keyBright/dashboard/lvglTest 四任务及其
+   demo/服务(demos、dashboard_screen、ai_dash_api、led_pwm)整体退役,
+   资源让位 small_smart 移植(Route B)。仅保留 defaultTask(看门狗守护)
+   与 monitorTask(内存/水位监控, 移植验收仪器, P6 收尾再撤)。 */
 /* USER CODE END Variables */
-/* Definitions for keyLedTask (按键控制 LED 任务) */
-osThreadId_t keyLedTaskHandle;
-const osThreadAttr_t keyLedTask_attributes = {
-  .name = "keyLedTask",
-  .stack_size = 1024 * 4,   /* 4KB: 跑 dbg_printf(vsnprintf ~160B 栈缓冲) + HAL 调用链 */
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 512 * 4,   /* 2KB: 任务里跑 MX_LWIP_Init(), 调用链 ~300B; 512B 会栈溢出踩坏 TCB →
                               调度器恢复坏上下文 → INVPC HardFault → IWDG 复位循环 (2026-08-27 二分已证实) */
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
-/* Definitions for lvglTestTask */
-osThreadId_t lvglTestTaskHandle;
-const osThreadAttr_t lvglTestTask_attributes = {
-  .name = "lvglTestTask",
-  .stack_size = 4096 * 4,   /* 16KB: 由 4KB 提升, 修复栈溢出导致的 HardFault(INVPC) */
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
-/* Definitions for keyBrightTask (长按调节 LED 亮度任务) */
-osThreadId_t keyBrightTaskHandle;
-const osThreadAttr_t keyBrightTask_attributes = {
-  .name = "keyBrightTask",
-  .stack_size = 1024 * 4,   /* 4KB: dbg_printf(vsnprintf ~160B 栈缓冲) + 按键轮询 */
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
-/* Definitions for dashboardTask (DeepSeek 用量数据轮询任务) */
-osThreadId_t dashboardTaskHandle;
-const osThreadAttr_t dashboardTask_attributes = {
-  .name = "dashboardTask",
-  .stack_size = 1024 * 4,   /* 4KB: socket 调用链 + dbg_printf(vsnprintf ~160B) */
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -107,14 +70,7 @@ const osThreadAttr_t monitorTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void StartLvglTestTask(void *argument);
-void StartKeyLedTask(void *argument);
-void StartKeyBrightTask(void *argument);
-void StartDashboardTask(void *argument);
 void StartMonitorTask(void *argument);
-extern void lv_port_disp_init(void);
-extern void lv_port_indev_init(void);
-extern void demo_advanced_update(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -154,10 +110,6 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  lvglTestTaskHandle = osThreadNew(StartLvglTestTask, NULL, &lvglTestTask_attributes);
-  keyLedTaskHandle = osThreadNew(StartKeyLedTask, NULL, &keyLedTask_attributes);
-  keyBrightTaskHandle = osThreadNew(StartKeyBrightTask, NULL, &keyBrightTask_attributes);
-  dashboardTaskHandle = osThreadNew(StartDashboardTask, NULL, &dashboardTask_attributes);
   monitorTaskHandle = osThreadNew(StartMonitorTask, NULL, &monitorTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
@@ -190,238 +142,6 @@ void StartDefaultTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-
-/**
-  * @brief  LVGL Demo 任务: 初始化 + 创建全功能 Demo + 周期调度
-  */
-void StartLvglTestTask(void *argument)
-{
-  uint16_t lcd_id;
-
-  dbg_printf("[dbg] lvglTestTask started\r\n");
-
-  dbg_printf("[dbg] LCD_Init ...\r\n");
-  LCD_Init();
-  lcd_id = LCD_ReadID();
-  dbg_printf("[dbg] LCD_Init done, ID=0x%04X\r\n", lcd_id);
-
-  if (GT9147_Init())
-  {
-    dbg_printf("[dbg] GT9147 OK\r\n");
-  }
-  else
-  {
-    dbg_printf("[dbg] GT9147 FAIL\r\n");
-  }
-
-  dbg_printf("[dbg] lv_init ...\r\n");
-  lv_init();
-  lv_port_disp_init();
-  lv_port_indev_init();
-  dbg_printf("[dbg] LVGL ready\r\n");
-
-  /* ---- 创建默认屏：DeepSeek 用量仪表盘 ---- */
-  dashboard_screen_create();
-  // demo_create();       /* 备用：完整版 Tabview Demo，由仪表盘 "Demo" 按钮打开 */
-  // demo_create_simple();  /* 极简版，测试是否是 UI 复杂度问题 */
-
-  /* ---- 周期调度 ---- */
-  /* [dbg] alive / [perf] 每秒打印已移除 (2026-08-30 串口降噪): 系统活性由
-     [mon] 10s 一行 + IWDG 兜底证明, LVGL 卡死会停喂狗触发复位; perf 统计
-     (lvgl_max/flush/pixels) 需要时从 git 历史找回 */
-  uint32_t last_tick = HAL_GetTick();
-  for (;;)
-  {
-    HAL_IWDG_Refresh(&hiwdg);   /* 喂狗: IWDG 超时 ~2s (LSI 32kHz/16, Reload 4095) */
-    uint32_t now = HAL_GetTick();
-    lv_tick_inc(now - last_tick);
-    last_tick = now;
-
-    /* 更新当前屏（仪表盘数据，或 demo 屏动画） */
-    dashboard_screen_update();
-
-    lv_task_handler();   /* LVGL 任务调度 */
-    osDelay(5);
-  }
-}
-
-/**
-  * @brief  按键控制 LED 任务: KEY0(PE4) 按下翻转 LED1(PF10)
-  * @note   硬件(探索者 V2.2): KEY0=PE4(低有效, 内部上拉), LED1=PF10(低电平点亮)
-  *         逻辑: 按下 -> 灯亮; 再按 -> 灯灭 (每次"按下沿"消抖后翻转一次)
-  *         本任务自带 GPIO 初始化 + 轮询, 必须喂狗, 防止 >2s 阻塞触发 IWDG
-  * @param  argument: Not used
-  * @retval None
-  */
-void StartKeyLedTask(void *argument)
-{
-  (void)argument;
-
-  /* ---- 引脚时钟与 GPIO 初始化 (CubeMX 未配置 KEY/LED, 此处按 board.h 初始化) ---- */
-  __HAL_RCC_GPIOE_CLK_ENABLE();   /* KEY0: GPIOE */
-  __HAL_RCC_GPIOF_CLK_ENABLE();   /* LED1: GPIOF */
-
-  /* KEY0 (PE4): 普通输入 + 内部上拉 (松开=高, 按下接地=低) */
-  GPIO_InitTypeDef gpio_key = {0};
-  gpio_key.Pin = BOARD_KEY0_PIN;
-  gpio_key.Mode = GPIO_MODE_INPUT;
-  gpio_key.Pull = GPIO_PULLUP;
-  gpio_key.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BOARD_KEY0_GPIO, &gpio_key);
-
-  /* LED1 (PF10): 推挽输出, 低电平点亮 */
-  GPIO_InitTypeDef gpio_led = {0};
-  gpio_led.Pin = BOARD_LED1_PIN;
-  gpio_led.Mode = GPIO_MODE_OUTPUT_PP;
-  gpio_led.Pull = GPIO_NOPULL;
-  gpio_led.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BOARD_LED1_GPIO, &gpio_led);
-
-  /* 初始状态: 熄灭 */
-  uint8_t led_on = 0;
-  HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN, BOARD_LED_INACTIVE_LEVEL);
-  dbg_printf("[key] keyLedTask started, KEY0=PE4 LED1=PF10 (active-low)\r\n");
-
-  const uint32_t debounce_ms = 20;   /* 消抖窗口 */
-  const uint32_t poll_ms = 10;       /* 轮询周期 */
-
-  uint8_t last_pressed = 0;   /* 上一次是否处于按下, 初始为未按下 */
-  for (;;)
-  {
-    HAL_IWDG_Refresh(&hiwdg);   /* 喂狗: IWDG 超时 ~2s */
-
-    uint8_t pressed = (HAL_GPIO_ReadPin(BOARD_KEY0_GPIO, BOARD_KEY0_PIN) == BOARD_KEY0_PRESS_LEVEL);
-
-    /* 检测"按下沿" (松开 -> 按下) */
-    if (pressed && !last_pressed)
-    {
-      /* 消抖: 等 debounce_ms 后再次确认仍处于按下 */
-      osDelay(debounce_ms);
-      HAL_IWDG_Refresh(&hiwdg);
-      if (HAL_GPIO_ReadPin(BOARD_KEY0_GPIO, BOARD_KEY0_PIN) == BOARD_KEY0_PRESS_LEVEL)
-      {
-        /* 确认是一次有效按下, 翻转 LED 亮灭 */
-        led_on = !led_on;
-        HAL_GPIO_WritePin(BOARD_LED1_GPIO, BOARD_LED1_PIN,
-                          led_on ? BOARD_LED_ACTIVE_LEVEL : BOARD_LED_INACTIVE_LEVEL);
-        dbg_printf("[key] KEY0 press -> LED1 %s\r\n", led_on ? "ON" : "OFF");
-      }
-      /* 等待松开, 避免按住时重复触发; 期间持续喂狗 */
-      while (HAL_GPIO_ReadPin(BOARD_KEY0_GPIO, BOARD_KEY0_PIN) == BOARD_KEY0_PRESS_LEVEL)
-      {
-        HAL_IWDG_Refresh(&hiwdg);
-        osDelay(debounce_ms);
-      }
-    }
-    last_pressed = pressed;
-
-    osDelay(poll_ms);
-  }
-}
-
-/**
-  * @brief  按键长按调节 LED 亮度任务: KEY1(PE3) 按住 -> LED0(PF9) 亮度 0%->100%->0% 循环
-  * @note   硬件(探索者 V2.2): KEY1=PE3(低有效, 内部上拉), LED0=PF9(低电平点亮)
-  *         亮度用 TIM14_CH1 硬件 PWM(1kHz, 1000 级), 本任务只调比较值 set_duty, 无中断
-  *         交互: 按住 ≥ 400ms 开始调光; 持续按住 0%->100%->0% 往返; 松开停在当前亮度
-  *         本任务自带 GPIO 初始化 + 轮询, 必须喂狗, 防止 >2s 阻塞触发 IWDG
-  * @param  argument: Not used
-  * @retval None
-  */
-void StartKeyBrightTask(void *argument)
-{
-  (void)argument;
-
-  /* ---- KEY1 (PE3): 普通输入 + 内部上拉 (松开=高, 按下接地=低) ---- */
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  GPIO_InitTypeDef gpio_key = {0};
-  gpio_key.Pin = BOARD_KEY1_PIN;
-  gpio_key.Mode = GPIO_MODE_INPUT;
-  gpio_key.Pull = GPIO_PULLUP;
-  gpio_key.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BOARD_KEY1_GPIO, &gpio_key);
-
-  /* ---- LED0 (PF9): 硬件 PWM 调光 (TIM14_CH1, 初始灭) ---- */
-  led_pwm_init();
-  uint8_t duty = led_pwm_get_duty();
-  dbg_printf("[bright] keyBrightTask started, KEY1=PE3 LED0=PF9 (HW-PWM, %d levels)\r\n",
-             (int)LED_PWM_LEVELS);
-
-  const uint32_t debounce_ms   = 20;    /* 消抖窗口 */
-  const uint32_t longpress_ms  = 400;   /* 长按阈值: 按住 >=400ms 才进入调光 */
-  const uint32_t ramp_step_ms  = 20;    /* 每次 20ms 调一级 (2s 扫完 0->100) */
-  const uint32_t poll_ms       = 10;    /* 轮询周期 */
-
-  uint8_t last_pressed = 0;   /* 上一次是否处于按下, 初始为未按下 */
-  for (;;)
-  {
-    HAL_IWDG_Refresh(&hiwdg);   /* 喂狗: IWDG 超时 ~2s */
-
-    uint8_t pressed = (HAL_GPIO_ReadPin(BOARD_KEY1_GPIO, BOARD_KEY1_PIN) == BOARD_KEY1_PRESS_LEVEL);
-
-    /* 检测"按下沿" (松开 -> 按下) */
-    if (pressed && !last_pressed)
-    {
-      /* 消抖: 等 debounce_ms 后再次确认仍处于按下 */
-      osDelay(debounce_ms);
-      HAL_IWDG_Refresh(&hiwdg);
-      if (HAL_GPIO_ReadPin(BOARD_KEY1_GPIO, BOARD_KEY1_PIN) == BOARD_KEY1_PRESS_LEVEL)
-      {
-        /* 确认一次有效按下, 进入长按调光循环 */
-        uint32_t hold_ms  = 0;
-        uint8_t  active   = 0;   /* 是否已跨过长按阈值开始调光 */
-        int8_t   dir      = 1;   /* +1 增亮, -1 减亮 (0%->100%->0% 往返) */
-        dbg_printf("[bright] KEY1 hold -> start ramping\r\n");
-
-        while (HAL_GPIO_ReadPin(BOARD_KEY1_GPIO, BOARD_KEY1_PIN) == BOARD_KEY1_PRESS_LEVEL)
-        {
-          HAL_IWDG_Refresh(&hiwdg);          /* 按住期间持续喂狗 */
-
-          hold_ms += ramp_step_ms;
-          if (hold_ms >= longpress_ms)
-          {
-            active = 1;
-          }
-
-          if (active)
-          {
-            if (dir > 0)
-            {
-              if (duty >= 100U) { duty = 100U; dir = -1; }
-              else              { duty++; }
-            }
-            else
-            {
-              if (duty <= 0U)   { duty = 0U;   dir = 1;  }
-              else              { duty--; }
-            }
-            led_pwm_set_duty(duty);
-
-            /* 每跨 5% 打印一次, 便于串口观察调光; 避免每 20ms 刷屏 */
-            if (duty % 5U == 0U)
-            {
-              dbg_printf("[bright] duty %u%%\r\n", duty);
-            }
-          }
-          osDelay(ramp_step_ms);
-        }
-
-        if (active)
-        {
-          dbg_printf("[bright] KEY1 release, duty=%u%%\r\n", duty);
-        }
-        else
-        {
-          dbg_printf("[bright] KEY1 tap(short) -> no change\r\n");
-        }
-      }
-      /* 注: 上面的 hold 循环在松开时即退出, 无需在此再等松开 */
-    }
-    last_pressed = pressed;
-
-    osDelay(poll_ms);
-  }
-}
 
 /* ---- FreeRTOS 调试钩子 (由 configCHECK_FOR_STACK_OVERFLOW=2 / configUSE_MALLOC_FAILED_HOOK=1 触发) ---- */
 

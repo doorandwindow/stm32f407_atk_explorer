@@ -39,6 +39,10 @@ extern uint32_t _ebss;      /* .bss 结束(静态占用 = data+bss, 含 40KB Fre
 
 extern uint32_t lv_port_disp_buf_bytes(void);   /* CCM 渲染单缓冲字节数 */
 
+/* 任务句柄(定义在 app/tasks/freertos.c): 逐任务栈水位用 */
+extern osThreadId_t defaultTaskHandle;
+extern osThreadId_t monitorTaskHandle;
+
 /**
  * @brief  字节 -> 0.1KB 定点数(四舍五入), 打印时拆成 x.y
  * @note   全整数运算(FPU 未开), 精度 ~103 字节, 足够看水位
@@ -148,6 +152,27 @@ void StartMonitorTask(void *argument)
                (unsigned)(busy_pm / 10U), (unsigned)(busy_pm % 10U),
                ht / 10U, ht % 10U, hu / 10U, hu % 10U, hf / 10U, hf % 10U,
                hp / 10U, hp % 10U, hm / 10U, hm % 10U);
+
+    /* ---- 逐任务栈水位(字节=水印字数×4): 裁栈/加任务的裁定依据 ----
+       高水位 = 栈创建后从未被写过的最小剩余。timer 服务任务栈固定 256 字,
+       未列入(取其句柄需 INCLUDE_xTimerGetTimerDaemonTaskHandle, 暂不开) */
+    {
+      const char *stk_names[3] = { "default", "monitor", "idle" };
+      TaskHandle_t stk_hs[3];
+      stk_hs[0] = defaultTaskHandle;
+      stk_hs[1] = monitorTaskHandle;
+      stk_hs[2] = xTaskGetIdleTaskHandle();
+      dbg_printf("[mon] stk(b)");
+      for (unsigned si = 0U; si < 3U; si++)
+      {
+        if (stk_hs[si] != NULL)
+        {
+          dbg_printf(" %s %u", stk_names[si],
+                     (unsigned)(uxTaskGetStackHighWaterMark(stk_hs[si]) * sizeof(StackType_t)));
+        }
+      }
+      dbg_printf("\r\n");
+    }
 
     /* ---- 芯片内部 RAM: 主 SRAM 静态区 + 中断栈水印; CCM 渲染缓冲 ---- */
     uint32_t isr_stack = isr_stack_used();

@@ -51,29 +51,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     bsp/components/lcd/nt35510/lcd.c
     bsp/components/touch/gt9147/gt9147.c
     bsp/components/uart/uart_dbg/uart_dbg.c
-    bsp/components/led/led_pwm.c
     bsp/components/rtstats/rtstats_tim.c
 
     # Application layer
     app/ports/lv_port_disp.c
     app/ports/lv_port_indev.c
 
-    # LVGL Demo
-    app/demos/demo_main.c
-    app/demos/demo_simple.c
-    app/demos/demo_basic.c
-    app/demos/demo_input.c
-    app/demos/demo_container.c
-    app/demos/demo_advanced.c
-
-    # Application services
-    app/services/ai_dash_api.c
-
-    # Application UI
-    app/ui/dashboard_screen.c
-
     # Application tasks
-    app/tasks/dashboard_task.c
     app/tasks/monitor_task.c
 )
 
@@ -95,17 +79,12 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/lcd/nt35510
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/touch/gt9147
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/uart/uart_dbg
-    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/led
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/rtstats
 
     # Application layer includes
     ${CMAKE_CURRENT_SOURCE_DIR}/app/core
     ${CMAKE_CURRENT_SOURCE_DIR}/app/tasks
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ports
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/demos
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/app/services
 
     # LVGL middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl
