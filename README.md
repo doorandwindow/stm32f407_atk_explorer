@@ -111,51 +111,37 @@ cmake --build build/Debug
 
 ## 当前进度
 
-- [x] 工程骨架：CubeMX + CMake/Ninja 构建链路打通
-- [x] CubeMX 外设初始化：以太网（RMII）、FreeRTOS、LwIP、FSMC、SPI1/2、USART1/3、RTC、IWDG、SDIO、USB OTG、DAC、TIM
-- [x] TFTLCD 驱动 `Src/lcd.c`：NT35510 480×800 竖屏，FSMC Bank4（NE4）8080 并口，背光 PB15
-- [x] GT9147 触摸驱动 `Src/gt9147.c`：模拟 I2C（SCL=PB0/SDA=PF11/RST=PC13/INT=PB1），地址 0x14
-      - **实测 IC 为 GT917S**（0x8140 读回 "917S"，寄存器兼容；官方例程 strcmp("9147") 在此批屏幕上同样匹配不到）
-      - 串口已验证按下/抬起事件流与坐标连续性；滑动到进度条区域坐标停更已修复（`lv_bar` 事件未冒泡）
-- [x] LVGL 8.3.11 集成：源码 + `lv_conf.h` + 显示/输入 port（`lv_port_disp.c` / `lv_port_indev.c`）
-      - LVGL 内存池 128KB 与显示缓冲约 192KB（双缓冲，每个 480×100）置于外部 SRAM IS62WV51216（FSMC NE3，CubeMX 已配置）
-      - 测试任务 `lvglTestTask`（8KB 栈）周期调度 `lv_task_handler`，界面含：进度条动画 / 按钮点击计数 / 触摸坐标实时显示 / 秒计数
-      - **编译通过**（345 编译单元，FLASH 467KB / RAM 107KB @ -O0 Debug）
-- [x] 业务功能：任务 `keyLedTask`（按键控制 LED）—— **已上板验证**（2026-08-29 与调光任务对换 LED 后）
-      - KEY0(PE4, 低有效/内部上拉) 按下翻转 LED1(PF10, 低电平点亮)；20ms 消抖 + 松开检测防重复触发
-      - 每次有效按下串口打印 `[key] KEY0 press -> LED1 ON/OFF`（实测严格交替，无误触发）
-      - 引脚定义在 `bsp/boards/alientek_explorer_v2.2/board.h`（KEY0/KEY1 + LED 电平宏）
-- [x] 业务功能：任务 `keyBrightTask`（长按调节 LED 亮度）—— **已上板验证**
-      - KEY1(PE3, 低有效/内部上拉) 长按(≥400ms) 调节 LED0(PF9) 亮度；0%→100%→0% 往返，20ms/级
-      - 亮度用 TIM14_CH1 硬件 PWM（PF9 是板上唯一硬件 PWM 引脚；1kHz / 1000 级 / 无中断）。早期版本亮度落在
-        PF10（无硬件 PWM）故用 TIM13 软 PWM，LED 对换后已废弃
-      - 串口打印 `[bright] KEY1 hold -> start ramping` / `duty NN%` / `release`；按住不足 400ms 为短按无动作
-      - 模块在 `bsp/components/led/led_pwm.{c,h}`；对换后两任务占用 PF9(PWM)/PF10(GPIO)，互不干扰
-- [x] 联网业务功能：DeepSeek 用量仪表盘（复刻 platform.deepseek.com/usage 用法）—— **编译通过 + 上板稳定**
-      - 开机默认屏：概览卡(余额/今日&本月费用/请求数/Tokens/缓存命中) + 请求折线 + Token 并排柱状 + 模型明细表
-        （英文标签，板子无中文字体）；"Refresh" 手动刷新、"Demo" 切回原实验界面
-      - 数据流：板子 `dashboardTask`(BSD socket, 按 IP, 30s) → `ai_dash_poll` 拉 PC 代理 `/api/dashboard`
-        → 写 `g_dash` → lvgl 刷新；代理负责 HTTPS/TLS + API Key + 记账(deepseek_usage.json)，密钥不上板
-      - 代理 `tools/deepseek_proxy.py`(可选 `--seed-demo`): 余额走公开 `GET /user/balance`，用量自采(带高峰计价/缓存率)
-      - FreeRTOS 堆 32KB→40KB(0xA000)：5 任务栈 30KB+TCB 超 32KB 曾致任务创建失败→IWDG 复位，已修复
-      - ⚠ 未联网端到端验证：板载网卡需接有 DHCP 的局域网、板与 PC 同网段、`AIDASH_PROXY_IP` 指到 PC 真实 IP、
-        并 `DEEPSEEK_API_KEY` 才能拉到真实数据；无网时稳定等待不崩（已上板验证）。本机网络为虚拟网卡，仅验证到"稳定+屏显示+等DHCP"
-- [x] 诊断功能：任务 `monitorTask`（每 10s 打印系统状态，内存字段 KB 显示/0.1 定点）—— **已上板验证**
-      - 三行输出：① `cpu x.x% + heap(bytes) 堆水位`；② `iram(bytes)` 主 SRAM 128KB（静态区=链接符号
-        `_sdata~_ebss`，含 40KB 堆池；`isr_stack`=中断栈水印——图案填充+从栈底向上扫描取最深占用）
-        `+ ccm(bytes)` CCM 64KB（LVGL 渲染单缓冲 57.6KB）；③ `eram(bytes)` 外部 SRAM 1MB（LVGL 对象池
-        128KB@0x68000000 的实时占用 `used` 与分配记账峰值 `lvgl_max`，口径不同后者偏小属正常）
-      - CPU 占用率：启用 `configGENERATE_RUN_TIME_STATS`，统计时钟用闲置 TIM11（1MHz 自由计数，16 位溢出中断
-        虚拟化成 32 位，见 `bsp/components/rtstats/`），忙占比 = 100% − 空闲任务运行占比，0.1% 整数精度
-      - 实测：稳态 cpu ~4-6%；主 SRAM 余量 ~16KB；中断栈水印 ~92B（保留区 1KB）；堆余量 4.2KB
-      - 串口降噪（2026-08-30）：移除 `[dbg] alive`/`[perf]` 每秒打印，周期输出只剩 `[mon]`(10s) + `[dash]`(30s)
-      - ⚠ `config/` 与 `Inc/` 两份 FreeRTOSConfig.h 必须同步修改（影响 TCB 布局，不一致会踩内存）；
-        CubeMX 重新生成会丢宏，需重加（同栈溢出检测宏约定）
-- [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑
-      `MX_LWIP_Init()`（实测调用链 ~300B），栈溢出踩坏调度器结构 → INVPC HardFault → IWDG 复位。
-      栈扩至 2KB，二分双向验证（512B 必死 / 2KB 稳定）。现串口心跳正常；屏幕显示内容与触摸坐标
-      方向仍需人工目视确认。完整证据链见 `debug-loop.md`
-- [ ] 业务功能开发（待开始）：传感器驱动、应用逻辑等
+### small_smart 移植 (2026-08-30 启动, Route B: LVGL 重绘到本板 NT35510)
+
+来源工程: `C:\Users\syclx\Desktop\env\exmple\small_smart`(RT-Thread + 大彩串口屏养殖舍环控器)。
+移植决策: 只保留 defaultTask, 旧实验任务全部退役; 界面用 LVGL 在本板重绘(横屏 800x480),
+不外接串口屏; 4G 通话/短信链路(AIR724+at_client)不移植; 控制外设桩化(板上无继电器)。
+
+- [x] **P1 清场**: 删 keyLed/keyBright/dashboard/lvglTest 四任务 + demos/dashboard_screen/
+      ai_dash_api/led_pwm; monitorTask 新增逐任务栈水位行。堆占用 35.9→7.4KB
+- [x] **P2 拔除 LwIP+ETH**: 构建层外科手术移除(ioc 保留原配置, 恢复路径见 cmake/stm32cubemx 注释);
+      defaultTask 纯喂狗化 1KB 栈。主 SRAM 静态 109.6→45.9KB(剩 ~80KB)。
+      顺带修复 rtstats 时钟回卷窗口倒退竞态([mon] cpu 荒谬值根除, 见 debug-loop.md 坑 10)
+- [x] **P3 任务骨架** (`app/smart/`): smart_data 数据模型(0.1 定点 + Flag_* 节拍 + 设备状态 +
+      11 项报警表, 沿源工程全局结构体模式) + smart_tick(1s 节拍, 替代 3 个 rt_timer) +
+      smart_periodic(10ms 控制状态机骨架, 45s 开机保护/风机轮启框架保留, 硬件桩) +
+      smart_alarm(5s 巡检: 高温/低温/传感器故障) + smart_sim(桩数据源)
+- [x] **P4 界面地基**: NT35510 扫描寄存器切横屏 800x480(零软件旋转开销) + 触摸轴变换;
+      中文字库 SimHei 75 字子集 16/24px(~85KB Flash, lv_font_conv 生成, 图标走 montserrat_20 回退);
+      smart_ui 任务(8KB, 5ms 循环); 页面管理器(create/update 模式替代源工程页面协程)
+- [x] **P5 页面**: 环境总览(默认页, 数据卡+设备状态格+报警横幅) / Setup 菜单 / 报警列表 /
+      目标温度设置(±0.5°C 步进) / 关于; 全部文案落在既有字库内
+- [ ] **P6 收尾**: 屏幕方向/触摸最终目视确认、30 分钟老化、monitor 撤除开关决策
+- [ ] 后续(按需): 真实传感器采集层替换 smart_sim、外部 SRAM 双缓冲、设置持久化(内部 Flash)
+
+### 历史实验 (2026-08-27~30, P1 清场后已退役: keyLed/keyBright/dashboard/DeepSeek 仪表盘/demo 界面)
+
+- [x] 工程骨架: CubeMX + CMake/Ninja 构建链路打通
+- [x] TFTLCD 驱动: NT35510(现横屏 800x480, 原竖屏 480x800), FSMC Bank4 8080 并口, 背光 PB15
+- [x] GT9147 触摸驱动: 模拟 I2C, **实测 IC 为 GT917S**(寄存器兼容, ID 校验双接受)
+- [x] LVGL 8.3.11 集成: 显示/输入 port + 对象池外部 SRAM 128KB + CCM 渲染缓冲
+- [x] monitorTask 诊断: 三层 RAM 水印 + 逐任务栈水位 + CPU 占用率(每 10s, `[mon]` 四行)
+- [x] IWDG 看门狗: ~2s 超时, 任何 >2s 阻塞必须喂狗; 栈溢出/malloc 失败钩子全开
 
 ## 声明
 

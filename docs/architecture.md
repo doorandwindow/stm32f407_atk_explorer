@@ -26,24 +26,34 @@ stm32f407/
 ├── Src/                        # CubeMX 生成的源文件（自动生成，勿手工修改）
 ├── CubeMX_Config.ioc          # CubeMX 配置文件
 │
-├── bsp/                        # Board Support Package（板级驱动）
-│   ├── inc/
-│   │   ├── lcd.h              # NT35510 LCD 驱动头文件
-│   │   ├── gt9147.h           # GT9147/GT917S 触摸驱动头文件
-│   │   └── uart_dbg.h         # 调试串口头文件
-│   └── src/
-│       ├── lcd.c              # LCD 驱动实现
-│       ├── lcd_nt35510_init.inc  # LCD 初始化序列
-│       ├── gt9147.c           # 触摸驱动实现
-│       └── uart_dbg.c         # 调试串口实现
+├── bsp/                        # BSP 层：板级驱动组件化
+│   ├── boards/
+│   │   └── alientek_explorer_v2.2/   # 板型配置 (board.h 硬件宏唯一真源)
+│   └── components/
+│       ├── lcd/nt35510/        # LCD 驱动 (800x480 横屏, lcd.h LCD_SCAN_MODE 切方向)
+│       ├── touch/gt9147/       # 触摸驱动 (GT9147/GT917S, 模拟 I2C)
+│       ├── uart/uart_dbg/      # 调试串口 (dbg_printf, USART1@115200)
+│       └── rtstats/            # FreeRTOS run-time stats 统计时钟 (TIM11)
 │
 ├── app/                        # 应用层代码
-│   ├── inc/                   # 应用层头文件（预留）
-│   └── src/
-│       ├── main.c             # 主程序（包含 USER CODE 区）
-│       ├── freertos.c         # FreeRTOS 任务定义
-│       ├── lv_port_disp.c     # LVGL 显示接口
-│       └── lv_port_indev.c    # LVGL 输入设备接口
+│   ├── core/
+│   │   └── main.c              # 主程序（包含 USER CODE 区）
+│   ├── tasks/
+│   │   └── freertos.c          # FreeRTOS 任务注册 + 调试钩子
+│   ├── ports/
+│   │   ├── lv_port_disp.c      # LVGL 显示接口 (CCM 渲染缓冲 800x36 行)
+│   │   └── lv_port_indev.c     # LVGL 输入接口 (横屏触摸轴变换 TP_MAP_FLIP)
+│   ├── smart/                  # small_smart 移植: 业务任务层
+│   │   ├── smart_data.{c,h}    # 数据模型 (0.1 定点 + Flag 节拍 + 报警表)
+│   │   ├── smart_sim.{c,h}     # 桩数据源 (无传感器时的模拟环境数据)
+│   │   ├── smart_tick_task.c   # 1s 节拍任务
+│   │   ├── smart_periodic_task.c # 10ms 控制状态机 (硬件桩)
+│   │   ├── smart_alarm_task.c  # 5s 报警巡检
+│   │   ├── smart_ui_task.c     # UI 任务 (LCD/LVGL 初始化 + 5ms 循环)
+│   │   └── smart_tasks.h       # 任务入口统一声明
+│   └── ui/
+│       ├── fonts/              # 中文字库 (lv_font_conv 生成, smart_text.h 为字符集真源)
+│       └── smart_pages/        # 页面管理器 + 五个页面 (create/update 模式)
 │
 ├── Drivers/                    # ST 官方驱动库（只读）
 │   ├── CMSIS/                 # ARM CMSIS 标准接口
@@ -53,8 +63,7 @@ stm32f407/
 ├── Middlewares/                # 中间件
 │   └── Third_Party/
 │       ├── FreeRTOS/          # FreeRTOS 实时操作系统
-│       ├── LwIP/              # LwIP 网络协议栈
-│       └── lvgl/              # LVGL 图形库
+│       └── lvgl/              # LVGL 图形库 (LwIP 已于 2026-08-30 P2 拔除出构建)
 │
 ├── docs/                       # 文档
 │   ├── architecture.md        # 本文件：架构说明
@@ -87,9 +96,11 @@ stm32f407/
 ### 3. 应用层（`app/`）
 - **作用**：应用逻辑和任务编排
 - **包含**：
-  - `main.c`：主程序入口（保留 CubeMX USER CODE 区）
-  - `freertos.c`：FreeRTOS 任务定义
-  - `lv_port_*.c`：LVGL 移植接口
+  - `core/main.c`：主程序入口（保留 CubeMX USER CODE 区）
+  - `tasks/freertos.c`：FreeRTOS 任务注册 + 栈溢出/malloc 钩子
+  - `ports/lv_port_*.c`：LVGL 显示/输入移植接口
+  - `smart/`：small_smart 移植业务任务（数据模型/节拍/控制桩/报警/UI 任务）
+  - `ui/`：页面管理器 + 页面 + 中文字库
 - **特点**：与具体应用业务相关
 
 ### 4. 驱动层（`Drivers/`）
@@ -98,22 +109,22 @@ stm32f407/
 
 ### 5. 中间件层（`Middlewares/`）
 - **作用**：第三方软件组件
-- **包含**：FreeRTOS、LwIP、LVGL
+- **包含**：FreeRTOS、LVGL（LwIP 已于 2026-08-30 拔除出构建）
 - **特点**：独立于硬件平台
 
 ### 6. 配置层（`config/`）
 - **作用**：集中管理所有配置头文件
-- **包含**：LVGL、FreeRTOS、LwIP、HAL 的配置文件
+- **包含**：LVGL、FreeRTOS、HAL 的配置文件（lwipopts.h 已删除）
 - **优势**：便于查找和修改配置
 
 ## CubeMX 兼容性
 
 ### 重新生成代码时的注意事项
 
-1. **保护 `app/src/main.c` 和 `app/src/freertos.c`**：
-   - 这两个文件已迁移到 `app/src/`，CubeMX 会在 `Src/` 重新生成它们
-   - 重新生成后，需要手工将 USER CODE 区的改动合并到 `app/src/` 版本
-   - 或者临时将 `app/src/main.c` 改名，让 CubeMX 生成后再合并
+1. **保护 `app/core/main.c` 和 `app/tasks/freertos.c`**：
+   - 这两个文件已迁移到 `app/`，CubeMX 会在 `Src/` 重新生成它们
+   - 重新生成后，需要手工将 USER CODE 区的改动合并到 `app/` 版本
+   - 或者临时将 `Src/` 生成的文件改名，让 CubeMX 生成后再合并
 
 2. **配置文件路径**：
    - `config/` 中的配置文件是复制品，原件仍在 `Inc/`

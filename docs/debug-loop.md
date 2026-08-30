@@ -21,58 +21,39 @@
 
 ## 已知启动输出（dbg_printf 走 USART1）
 
-`Src/main.c` 在 main 开头打印复位源 (RCC->CSR) 并清标志。
-`Src/freertos.c` 打印 `lvglTestTask started` / `LCD_Init` / `GT9147` / `LVGL ready` 四阶段。
+`app/core/main.c` 在 main 开头打印复位源 (RCC->CSR) 并清标志。
 
-预期正常启动输出:
+预期正常启动输出 (2026-08-30 small_smart 移植 P4 起):
 ```
 [dbg] RST cause 0x04000003: PIN      (烧录复位; IWDG 标志出现即说明发生过喂狗失败)
-[dbg] lvglTestTask started
-[dbg] LCD_Init done, ID=0x5510
+[smart] alarm started (5s patrol)
+[ui] LCD ID=0x5510                   (NT35510)
 [dbg] GT9147 CTP ID: 917S
-[dbg] GT9147 OK
-[dbg] LVGL ready
+[ui] GT9147 OK
+[ui] pages ready, main created       (环境总览页创建完成)
+[smart] tick started (1s beat)
+[smart] periodic started (10ms loop, hw-stubbed)
+[alm] #N ON/OFF @Ns                  (报警沿触发时; 稳态无输出)
+[ui] go page N                       (触摸切页时: 1=Setup 2=报警 3=目标温度 4=关于)
 ```
 
-串口周期输出只剩两类 (2026-08-30 降噪后): `[mon]` 每 10s 一行 + `[dash]` 每 30s 一行。
-`[dbg] alive` 与 `[perf]` 每秒打印已移除 (活性由 [mon] + IWDG 兜底证明, perf 统计从 git 历史找回)。
+串口周期输出只剩 `[mon]` 每 10s 四行 (cpu+heap / stk 逐任务栈水位 / iram+ccm / eram)。
+历史任务输出 (keyLed/keyBright/dash/lvglTest) 已随 2026-08-30 P1 清场退役, 从 git 历史找回。
 
-按键控制 LED 任务 (keyLedTask) 追加输出 (2026-08-29 新增, 已上板验证):
-```
-[key] keyLedTask started, KEY0=PE4 LED1=PF10 (active-low)
-[key] KEY0 press -> LED1 ON      (按 KEY0(PE4) 时出现, 严格 ON/OFF 交替, 消抖 20ms)
-```
-
-长按调光任务 (keyBrightTask) 输出 (2026-08-29 新增, 已上板验证; 亮度的 LED 对换方案):
-```
-[bright] keyBrightTask started, KEY1=PE3 LED0=PF9 (HW-PWM, 1000 levels)
-[bright] KEY1 hold -> start ramping
-[bright] duty 5%               (按住后每跨 5% 打印一次; 0%->100%->0% 往返)
-[bright] KEY1 release, duty=NN%
-[bright] KEY1 tap(short) -> no change   (按住 <400ms, 不调光)
-```
-
-DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
-```
-[dash] dashboardTask started, proxy 192.168.31.83:8000 every 30000ms
-[ui]   dashboard screen created
-[dash] no IP (DHCP) yet             (板子没网/无 DHCP 时每轮等待 15s; 有 IP 则是)
-[dash] got N bytes / parsed bal=... req=... tok=... cache=...% models=...   (成功拉取)
-[dash] connect fail/timeout to ip:port                                      (代理不可达/不同网段)
-```
-
-系统状态监控任务 (2026-08-30 新增, 已上板验证; 同日起周期 1s→10s 降噪):
+系统状态监控任务 (每 10s 四行, 含逐任务栈水位):
 ```
 [mon] monitorTask started, period 10000ms
-[mon] cpu 5.8% | heap(kb) total 40.0 used 35.9 free 4.1 peak_used 35.9 min_free 4.1
-[mon] iram(kb) total 128.0 static 112.1 isr_stack 0.1 free 15.8 | ccm(kb) total 64.0 buf 56.3 free 7.8
-[mon] eram(kb) total 1024.0 pool 128.0 used 15.6 lvgl_max 7.8
-      每 10s 三行; cpu=整机忙占比(稳态 ~5%); 内存字段单位 KB(0.1 定点, 全整数换算)
+[mon] cpu 10.5% | heap(kb) total 40.0 used 16.7 free 23.3 peak_used 16.7 min_free 23.3
+[mon] stk(b) default 924 monitor 1208 tick 456 periodic 1480 alarm 1472 ui 6356 idle 428
+[mon] iram(kb) total 128.0 static 47.5 isr_stack 0.1 free 80.4 | ccm(kb) total 64.0 buf 56.3 free 7.8
+[mon] eram(kb) total 1024.0 pool 128.0 used 16.5 lvgl_max 8.7
+      cpu=整机忙占比; 内存字段单位 KB(0.1 定点, 全整数换算)
       heap = FreeRTOS 堆(heap_4); peak_used/min_free 是开机以来历史极值, 顶穿 40.0 会触发 [HOOK] 复位
+      stk  = 逐任务栈高水位(字节): 剩余未写过空间, 裁栈/加任务以 ×2 峰值为准 (P1 起新增)
       iram = 主 SRAM 128KB: static=data+bss(含 40KB 堆池 ucHeap), isr_stack=中断栈水印
              (图案填充+从栈底向上扫描, 深于 1KB 保留区即危险), free=total-static-isr_stack
-      ccm  = CCM 64KB: LVGL 渲染单缓冲 57.6KB 固定占用
-      eram = 外部 SRAM 1MB: 目前 LVGL 对象池是唯一占用者; used=TLSF 池实时占用(含块头开销),
+      ccm  = CCM 64KB: LVGL 渲染单缓冲 57.6KB 固定占用 (800x36 行, 横屏化后行数 60->36)
+      eram = 外部 SRAM 1MB: LVGL 对象池 128KB@0x68000000 是唯一占用者; used=TLSF 池实时占用,
              lvgl_max=LVGL 分配记账峰值(仅请求字节), 口径不同 max<used 属正常
 ```
 
@@ -86,7 +67,10 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
    - `configCHECK_FOR_STACK_OVERFLOW=2` + `configUSE_MALLOC_FAILED_HOOK=1`
    - 对应钩子在 `Src/freertos.c` USER CODE Application 区末尾 (`[HOOK] STACK OVERFLOW task=...`)
    - CubeMX GUI 里也可勾选: FreeRTOS 页 → Advanced settings → USE_MALLOC_FAILED_HOOK / CHECK_FOR_STACK_OVERFLOW
-4. **MX_LWIP_Init 在 defaultTask 里同步调用** (`Src/freertos.c`), PHY 失联时阻塞——该任务栈给 2KB 起步
+4. ~~MX_LWIP_Init 在 defaultTask 里同步调用~~ **已退役 (2026-08-30 P2)**: LwIP+ETH 整体出构建
+   (外科手术式, 见 `cmake/stm32cubemx/CMakeLists.txt` 头部注释)。defaultTask 现为纯喂狗(1KB 栈)。
+   ⚠ ioc 中 LwIP/ETH 配置仍保留: 若将来 CubeMX 重新生成, LwIP 会回到编译(无调用点, 仅 RAM 回退),
+   需重做手术或在 CubeMX GUI 取消勾选 LwIP 中间件
 5. HAL 时基走 TIM7, SysTick 给 FreeRTOS — 不冲突
 6. ~~configCHECK_FOR_STACK_OVERFLOW=2 会破坏启动~~ **已证伪**: 之前"开检测就不能启动"是因为钩子
    尚未就位/配置半途而废; 现状检测全开 + 2KB 栈, 启动干净 (2026-08-27 两次 8-10s 抓串口验证)
@@ -102,20 +86,38 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
    现象: 串口只见 `[dash] dashbo...` 刷屏、lvgl/其它任务不打印、`RST cause 0x24000003: IWDG`。
    修复: `configTOTAL_HEAP_SIZE` 升到 0xA000(Inc/FreeRTOSConfig.h + config/FreeRTOSConfig.h 两处都要改)。
    ⚠ IWDG 复位后第一时间怀疑: 新加任务的栈 + TCB 是否把 32KB 堆顶穿。
-9. **板端网络**: 板子纯 DHCP(`lwip.c` 三地址清零), 无 DNS; 拉代理必须按 IP, 且板子要有物理以太网链路+DHCP 才行。
-   无网时 `ai_dash_poll` 静默等 15s 再重试, 不会复位(已验证稳定)。
+9. ~~板端网络~~ **随 P2 拔除 LwIP 一并退役 (2026-08-30)**; 恢复网络时连同坑 4 一起回补。
+10. **rtstats 时钟回卷窗口倒退竞态** (2026-08-30 P2 发现并修复): TIM11 16 位计数器 65.5ms 回卷一次,
+    CNT 已回卷但溢出 ISR(优先级 15, 可被 BASEPRI 屏蔽延迟)尚未执行时读时钟, 读数倒退最多 65.5ms;
+    FreeRTOS 用它算任务运行差值会下溢, `[mon] cpu` 打出 42936.6% 一类荒谬值。
+    修复: `rtstats_rtclock_get()` 检测 UIF 挂起且 CNT<0x8000 时补偿 +1 个高位 (见 bsp/components/rtstats/)。
+11. **横屏 800x480 的方向配套** (P4.0): `lcd.h LCD_SCAN_MODE`(0x60 候选A / 0xA0 候选B, 倒 180° 时互换)
+    与 `lv_port_indev.c TP_MAP_FLIP`(1/0) 必须成组切换; 只换一个会出现"画面正但触摸镜像错位"。
+    CCM 渲染缓冲横屏后为 800x36 行(仍 57.6KB), 行数在 `lv_port_disp.c DISP_BUF_LINES`。
+12. **中文字库再生成** (P4 起): 文案字符集真源是 `app/ui/smart_pages/smart_text.h`(75 字),
+    新增中文文案后需重新生成字库, 否则新字符显示为空:
+    ```bash
+    node -e "..."   # 从 smart_text.h 提取唯一非 ASCII 字符 -> build/font_charset.txt
+    npx --yes lv_font_conv --no-compress --bpp 4 --size 16 --format lvgl --lv-include lvgl.h \
+      --lv-fallback lv_font_montserrat_20 --font C:/Windows/Fonts/simhei.ttf \
+      -r 0x20-0x7E -r 0xB0 --symbols "$(cat build/font_charset.txt)" -o app/ui/fonts/smart_cn_16.c
+    # 24px 同理 (smart_cn_24.c); 注意 -r 必须放在 --font 之后; LV_SYMBOL_* 走 montserrat_20 回退
+    ```
 
-## RAM 布局速查 (build/Debug/CubeMX_Config.map, 2026-08-30, -O2)
+## RAM 布局速查 (build/Debug/CubeMX_Config.map, 2026-08-30 P2 后, -O2)
 
 ```
 ucHeap        0x20001004  0xA000  (FreeRTOS 堆 40KB, 任务栈从这里分配; [mon] 实时水位)
-_sdata        0x20000000          (data+bss 起点, static=114824 由 [mon] 实时打印)
-_ebss         0x2001C088          (静态区结束)
+_sdata        0x20000000          (data+bss 起点, P2 后 static≈48.6KB 由 [mon] 实时打印)
+_ebss         ≈0x2000C1xx         (静态区结束; 主 SRAM 剩余 ~80KB)
 _sstack       0x2001FC00          (MSP 中断栈底, 保留 1KB; [mon] isr_stack 实时水印)
 _estack       0x20020000          (MSP 顶; CM4F 端口切换后 MSP 常驻 _estack-0x20 属正常)
-CCM           0x10000000  0x10000 (LVGL 渲染单缓冲 57.6KB, [mon] ccm 实时打印)
+CCM           0x10000000  0x10000 (LVGL 渲染单缓冲 57.6KB=800x36 行, [mon] ccm 实时打印)
 外部 SRAM     0x68000000  0x100000 (LVGL 对象池 128KB@基址, [mon] eram 实时水位)
 ```
+
+P1/P2 清场账 (2026-08-30): 静态区 114.8→47.5KB (退役 LwIP ~64KB + demo/服务 ~3KB),
+堆占用 35.9→16.7KB (6 任务栈 17KB + TCB); 当前余量: 主 SRAM ~80KB / 堆 min_free ~23KB / Flash ~75%。
 
 ## 常用命令
 
