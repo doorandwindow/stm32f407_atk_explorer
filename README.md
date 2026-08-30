@@ -131,6 +131,15 @@ cmake --build build/Debug
         PF10（无硬件 PWM）故用 TIM13 软 PWM，LED 对换后已废弃
       - 串口打印 `[bright] KEY1 hold -> start ramping` / `duty NN%` / `release`；按住不足 400ms 为短按无动作
       - 模块在 `bsp/components/led/led_pwm.{c,h}`；对换后两任务占用 PF9(PWM)/PF10(GPIO)，互不干扰
+- [x] 联网业务功能：DeepSeek 用量仪表盘（复刻 platform.deepseek.com/usage 用法）—— **编译通过 + 上板稳定**
+      - 开机默认屏：概览卡(余额/今日&本月费用/请求数/Tokens/缓存命中) + 请求折线 + Token 并排柱状 + 模型明细表
+        （英文标签，板子无中文字体）；"Refresh" 手动刷新、"Demo" 切回原实验界面
+      - 数据流：板子 `dashboardTask`(BSD socket, 按 IP, 30s) → `ai_dash_poll` 拉 PC 代理 `/api/dashboard`
+        → 写 `g_dash` → lvgl 刷新；代理负责 HTTPS/TLS + API Key + 记账(deepseek_usage.json)，密钥不上板
+      - 代理 `tools/deepseek_proxy.py`(可选 `--seed-demo`): 余额走公开 `GET /user/balance`，用量自采(带高峰计价/缓存率)
+      - FreeRTOS 堆 32KB→40KB(0xA000)：5 任务栈 30KB+TCB 超 32KB 曾致任务创建失败→IWDG 复位，已修复
+      - ⚠ 未联网端到端验证：板载网卡需接有 DHCP 的局域网、板与 PC 同网段、`AIDASH_PROXY_IP` 指到 PC 真实 IP、
+        并 `DEEPSEEK_API_KEY` 才能拉到真实数据；无网时稳定等待不崩（已上板验证）。本机网络为虚拟网卡，仅验证到"稳定+屏显示+等DHCP"
 - [ ] 上板验证（进行中）：**已修复「每 ~2.86s 复位循环」**——根因是 defaultTask 栈仅 512B 却同步跑
       `MX_LWIP_Init()`（实测调用链 ~300B），栈溢出踩坏调度器结构 → INVPC HardFault → IWDG 复位。
       栈扩至 2KB，二分双向验证（512B 必死 / 2KB 稳定）。现串口心跳正常；屏幕显示内容与触摸坐标

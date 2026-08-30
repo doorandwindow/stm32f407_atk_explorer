@@ -50,6 +50,15 @@
 [bright] KEY1 tap(short) -> no change   (按住 <400ms, 不调光)
 ```
 
+DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
+```
+[dash] dashboardTask started, proxy 192.168.31.83:8000 every 30000ms
+[ui]   dashboard screen created
+[dash] no IP (DHCP) yet             (板子没网/无 DHCP 时每轮等待 15s; 有 IP 则是)
+[dash] got N bytes / parsed bal=... req=... tok=... cache=...% models=...   (成功拉取)
+[dash] connect fail/timeout to ip:port                                      (代理不可达/不同网段)
+```
+
 ## 已知坑 / 风险点
 
 1. **IWDG 超时约 2s** (LSI 32kHz /16, Reload 4095; Prescaler/Reload 已回写 `CubeMX_Config.ioc`, 重新生成不会再回退 /4≈0.5s)
@@ -70,6 +79,14 @@
    - **CT_INT(PB1) 在复位释放后不可推挽驱动** (哪怕 ~10ms): 会与 GT9147 的 INT 输出顶驱,
      模块亚健康。正确做法: INT 全程输入上拉, 只操作 RST, 地址 0x14 靠上拉高电平选出
    - 修复后量程修正带幂等保护 (已对则跳过写), 避免每次上电写 GT 配置 EEPROM 磨损
+8. **FreeRTOS 堆 32KB→40KB (0xA000)** (2026-08-29): 加了 dashboardTask(4KB 栈)后 5 任务栈
+   30KB(default 2 + lvgl 16 + keyLed 4 + keyBright 4 + dashboard 4) + idle/timer 栈 1.5KB + 7 个 TCB ≈ 32.1KB
+   **超过 32KB 堆** → 最后分配(idle/timer 任务)失败 → 调度器不喂狗 → IWDG 每 ~2.1s 复位。
+   现象: 串口只见 `[dash] dashbo...` 刷屏、lvgl/其它任务不打印、`RST cause 0x24000003: IWDG`。
+   修复: `configTOTAL_HEAP_SIZE` 升到 0xA000(Inc/FreeRTOSConfig.h + config/FreeRTOSConfig.h 两处都要改)。
+   ⚠ IWDG 复位后第一时间怀疑: 新加任务的栈 + TCB 是否把 32KB 堆顶穿。
+9. **板端网络**: 板子纯 DHCP(`lwip.c` 三地址清零), 无 DNS; 拉代理必须按 IP, 且板子要有物理以太网链路+DHCP 才行。
+   无网时 `ai_dash_poll` 静默等 15s 再重试, 不会复位(已验证稳定)。
 
 ## RAM 布局速查 (build/Debug/CubeMX_Config.map, -O0)
 

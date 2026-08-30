@@ -33,6 +33,8 @@
 #include "demo_main.h"
 #include "board.h"
 #include "led_pwm.h"
+#include "dashboard_screen.h"
+#include "ai_dash_api.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,11 +89,20 @@ const osThreadAttr_t keyBrightTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
+/* Definitions for dashboardTask (DeepSeek 用量数据轮询任务) */
+osThreadId_t dashboardTaskHandle;
+const osThreadAttr_t dashboardTask_attributes = {
+  .name = "dashboardTask",
+  .stack_size = 1024 * 4,   /* 4KB: socket 调用链 + dbg_printf(vsnprintf ~160B) */
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void StartLvglTestTask(void *argument);
 void StartKeyLedTask(void *argument);
 void StartKeyBrightTask(void *argument);
+void StartDashboardTask(void *argument);
 extern void lv_port_disp_init(void);
 extern void lv_port_disp_get_stats(uint32_t *count, uint32_t *pixels);
 extern void lv_port_indev_init(void);
@@ -138,6 +149,7 @@ void MX_FREERTOS_Init(void) {
   lvglTestTaskHandle = osThreadNew(StartLvglTestTask, NULL, &lvglTestTask_attributes);
   keyLedTaskHandle = osThreadNew(StartKeyLedTask, NULL, &keyLedTask_attributes);
   keyBrightTaskHandle = osThreadNew(StartKeyBrightTask, NULL, &keyBrightTask_attributes);
+  dashboardTaskHandle = osThreadNew(StartDashboardTask, NULL, &dashboardTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -199,8 +211,9 @@ void StartLvglTestTask(void *argument)
   lv_port_indev_init();
   dbg_printf("[dbg] LVGL ready\r\n");
 
-  /* ---- 创建 Demo 界面 ---- */
-  demo_create();  /* 完整版 Tabview */
+  /* ---- 创建默认屏：DeepSeek 用量仪表盘 ---- */
+  dashboard_screen_create();
+  // demo_create();       /* 备用：完整版 Tabview Demo，由仪表盘 "Demo" 按钮打开 */
   // demo_create_simple();  /* 极简版，测试是否是 UI 复杂度问题 */
 
   /* ---- 周期调度 ---- */
@@ -220,8 +233,8 @@ void StartLvglTestTask(void *argument)
       dbg_printf("[dbg] alive %lu s\r\n", (unsigned long)(alive_cnt / 200));
     }
 
-    /* 更新 Tab 4 高级特性中的动画控件 */
-    demo_advanced_update();
+    /* 更新当前屏（仪表盘数据，或 demo 屏动画） */
+    dashboard_screen_update();
 
     uint32_t handler_start = HAL_GetTick();
     lv_task_handler();   /* LVGL 任务调度 */

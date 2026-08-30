@@ -51,9 +51,10 @@ stm32f407/
 `main.c`: 外设 MX_*_Init → `MX_FREERTOS_Init()`（`Src/freertos.c`）→ `osKernelStart()`。
 注意：`MX_RTC_Init` 和 `MX_SDIO_SD_Init` 目前被注释（诊断原因，见行内注释）。
 
-FreeRTOS 任务（CMSIS-RTOS2，堆 32KB，见 `Inc/FreeRTOSConfig.h`）：
+FreeRTOS 任务（CMSIS-RTOS2，堆 40KB 0xA000，见 `Inc/FreeRTOSConfig.h`；⚠ 不要再降回 32KB——5 任务栈 30KB+TCB 会超导致任务创建失败→喂狗停摆→IWDG 复位）：
 - `defaultTask`（512B 栈）：`MX_LWIP_Init()` + 死循环喂 IWDG。
-- `lvglTestTask`（8KB 栈）：`LCD_Init` → `GT9147_Init` → `lv_init` + `lv_port_disp_init` + `lv_port_indev_init` → 建测试界面 → 5ms 循环（`lv_tick_inc` / `lv_task_handler` / 喂狗）。
+- `lvglTestTask`（8KB 栈）：`LCD_Init` → `GT9147_Init` → `lv_init` + `lv_port_disp_init` + `lv_port_indev_init` → 建默认屏(仪表盘)→ 5ms 循环（`lv_tick_inc` / `lv_task_handler` / 喂狗）。`dashboard_screen_update()` 每循环刷新仪表盘/或 demo 动画。
+- `dashboardTask`（4KB 栈）：每 30s `ai_dash_poll` 拉 PC 代理 → 写 `g_dash` 供 lvgl 刷新（socket 带超时，等 DHCP 最多 15s）。
 
 ### 硬件资源与内存布局（跨文件约定，勿破坏）
 

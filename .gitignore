@@ -26,3 +26,9 @@ Thumbs.db
 
 # ===== WorkBuddy 项目数据 =====
 .workbuddy/
+
+# ===== DeepSeek 代理记账数据(本地, 勿提交) =====
+tools/deepseek_usage.json
+
+# ===== Python 缓存 =====
+__pycache__/

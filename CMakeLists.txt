@@ -64,6 +64,15 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     app/demos/demo_input.c
     app/demos/demo_container.c
     app/demos/demo_advanced.c
+
+    # Application services
+    app/services/ai_dash_api.c
+
+    # Application UI
+    app/ui/dashboard_screen.c
+
+    # Application tasks
+    app/tasks/dashboard_task.c
 )
 
 # LVGL 8.3.11 源码
@@ -93,6 +102,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ports
     ${CMAKE_CURRENT_SOURCE_DIR}/app/demos
     ${CMAKE_CURRENT_SOURCE_DIR}/app/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/services
 
     # LVGL middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl
