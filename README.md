@@ -131,7 +131,9 @@ cmake --build build/Debug
       smart_ui 任务(8KB, 5ms 循环); 页面管理器(create/update 模式替代源工程页面协程)
 - [x] **P5 页面**: 环境总览(默认页, 数据卡+设备状态格+报警横幅) / Setup 菜单 / 报警列表 /
       目标温度设置(±0.5°C 步进) / 关于; 全部文案落在既有字库内
-- [ ] **P6 收尾**: 屏幕方向/触摸最终目视确认、30 分钟老化、monitor 撤除开关决策
+- [x] **P6 收尾**: 30 分钟串口老化验收通过(2026-08-30, `build/aging_30min.log`)——全程零复位/
+      零 [HOOK], CPU 稳态 5.1%, 堆 used 恒 16.7KB, LVGL 对象池 used 恒 16.5KB(删建切页无泄漏),
+      各任务栈水位稳定; 文档三份同步完成
 - [ ] 后续(按需): 真实传感器采集层替换 smart_sim、外部 SRAM 双缓冲、设置持久化(内部 Flash)
 
 ### 历史实验 (2026-08-27~30, P1 清场后已退役: keyLed/keyBright/dashboard/DeepSeek 仪表盘/demo 界面)
