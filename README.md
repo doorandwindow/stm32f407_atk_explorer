@@ -141,11 +141,13 @@ cmake --build build/Debug
       - ⚠ 未联网端到端验证：板载网卡需接有 DHCP 的局域网、板与 PC 同网段、`AIDASH_PROXY_IP` 指到 PC 真实 IP、
         并 `DEEPSEEK_API_KEY` 才能拉到真实数据；无网时稳定等待不崩（已上板验证）。本机网络为虚拟网卡，仅验证到"稳定+屏显示+等DHCP"
 - [x] 诊断功能：任务 `monitorTask`（每 10s 打印系统状态）—— **已上板验证**
-      - 串口输出 `[mon] cpu x.x% | heap total/used/free/peak_used/min_free`：堆已用/未用来自 heap_4 的
-        `xPortGetFreeHeapSize`；历史峰值使用与最小剩余由 `xPortGetMinimumEverFreeHeapSize` 天然记录
+      - 三行输出：① `cpu x.x% + heap(bytes) 堆水位`；② `iram(bytes)` 主 SRAM 128KB（静态区=链接符号
+        `_sdata~_ebss`，含 40KB 堆池；`isr_stack`=中断栈水印——图案填充+从栈底向上扫描取最深占用）
+        `+ ccm(bytes)` CCM 64KB（LVGL 渲染单缓冲 57.6KB）；③ `eram(bytes)` 外部 SRAM 1MB（LVGL 对象池
+        128KB@0x68000000 的实时占用 `used` 与分配记账峰值 `lvgl_max`，口径不同后者偏小属正常）
       - CPU 占用率：启用 `configGENERATE_RUN_TIME_STATS`，统计时钟用闲置 TIM11（1MHz 自由计数，16 位溢出中断
         虚拟化成 32 位，见 `bsp/components/rtstats/`），忙占比 = 100% − 空闲任务运行占比，0.1% 整数精度
-      - 实测：开机首窗 ~10%（LVGL 初始化突发摊到 10s 窗）→ 稳态 ~4%；堆余量 4.2KB；任务栈 2KB、优先级 BelowNormal
+      - 实测：稳态 cpu ~4-6%；主 SRAM 余量 ~16KB；中断栈水印 ~92B（保留区 1KB）；堆余量 4.2KB
       - 串口降噪（2026-08-30）：移除 `[dbg] alive`/`[perf]` 每秒打印，周期输出只剩 `[mon]`(10s) + `[dash]`(30s)
       - ⚠ `config/` 与 `Inc/` 两份 FreeRTOSConfig.h 必须同步修改（影响 TCB 布局，不一致会踩内存）；
         CubeMX 重新生成会丢宏，需重加（同栈溢出检测宏约定）

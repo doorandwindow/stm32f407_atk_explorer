@@ -100,11 +100,10 @@ extern "C" {
 #define BOARD_EXT_SRAM_SIZE     (1024 * 1024)  /* 1MB */
 #define BOARD_EXT_SRAM_BASE     0x68000000     /* FSMC Bank1 NE3 */
 
-/* LVGL 内存布局（使用外部 SRAM） */
-#define BOARD_LVGL_MEM_BASE     0x68000000     /* LVGL 内存池起始地址 */
+/* LVGL 内存布局 */
+#define BOARD_LVGL_MEM_BASE     0x68000000     /* LVGL 内存池起始地址(lv_conf.h LV_MEM_ADR 同源) */
 #define BOARD_LVGL_MEM_SIZE     (128 * 1024)   /* 128KB */
-#define BOARD_LVGL_BUF_BASE     0x68020000     /* LVGL 显示缓冲起始地址 */
-#define BOARD_LVGL_BUF_SIZE     (192 * 1024)   /* 双缓冲，每个 480×100×2 字节 */
+/* 显示缓冲已迁至 CCM(0x10000000, 单缓冲 480×60×2B, 提速), 见 app/ports/lv_port_disp.c */
 
 /* ============================================================================
    看门狗配置

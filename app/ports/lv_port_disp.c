@@ -52,6 +52,14 @@ void lv_port_disp_get_stats(uint32_t *count, uint32_t *pixels)
 }
 
 /**
+ * @brief 获取渲染缓冲区字节数 (CCM 单缓冲, 供监控任务报告 CCM 占用)
+ */
+uint32_t lv_port_disp_buf_bytes(void)
+{
+    return (uint32_t)DISP_BUF_PIXELS * sizeof(lv_color_t);
+}
+
+/**
   * @brief LVGL 显示驱动初始化（须在 lv_init 之后调用）
   */
 void lv_port_disp_init(void)

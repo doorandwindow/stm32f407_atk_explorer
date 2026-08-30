@@ -10,8 +10,8 @@
 - TFTLCD: NT35510, 480×800, FSMC Bank4 NE4 (0x6C000000), 背光 PB15
 - 触摸: GT9147 (模拟 I2C, 0x14)
 - 外部 SRAM: IS62WV51216, FSMC Bank3 NE3 (0x68000000), 1 MB
-  - LVGL mem pool: 0x68000000 起 128 KB
-  - LVGL disp buf:  0x68020000 起约 192 KB (双缓冲，每个 480×100)
+  - LVGL mem pool: 0x68000000 起 128 KB (lv_conf.h LV_MEM_ADR)
+  - LVGL 渲染缓冲: 已迁至 CCM 0x10000000 (单缓冲 480×60×2B=57.6KB, 提速), 见 app/ports/lv_port_disp.c
 
 ## 串口参数
 - 端口: COM18 (CH340)
@@ -65,8 +65,15 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
 ```
 [mon] monitorTask started, period 10000ms
 [mon] cpu 5.8% | heap(bytes) total 40960 used 36744 free 4216 peak_used 36744 min_free 4216
-      每 10s 一行, heap 各字段单位为字节; cpu=整机忙占比(开机首窗偏高属 LVGL 初始化突发, 稳态 ~5%)
-      peak_used/min_free 是开机以来历史极值, used/heap 顶穿 40960 会在创建任务时触发 [HOOK] 复位
+[mon] iram(bytes) total 131072 static 114824 isr_stack 92 free 16156 | ccm(bytes) total 65536 buf 57600 free 7936
+[mon] eram(bytes) total 1048576 pool 131072 used 15988 lvgl_max 7980
+      每 10s 三行; cpu=整机忙占比(稳态 ~5%)
+      heap = FreeRTOS 堆(heap_4); peak_used/min_free 是开机以来历史极值, 顶穿 40960 会触发 [HOOK] 复位
+      iram = 主 SRAM 128KB: static=data+bss(含 40KB 堆池 ucHeap), isr_stack=中断栈水印
+             (图案填充+从栈底向上扫描, 深于 1KB 保留区即危险), free=total-static-isr_stack
+      ccm  = CCM 64KB: LVGL 渲染单缓冲 57.6KB 固定占用
+      eram = 外部 SRAM 1MB: 目前 LVGL 对象池是唯一占用者; used=TLSF 池实时占用(含块头开销),
+             lvgl_max=LVGL 分配记账峰值(仅请求字节), 口径不同 max<used 属正常
 ```
 
 ## 已知坑 / 风险点
@@ -98,17 +105,16 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
 9. **板端网络**: 板子纯 DHCP(`lwip.c` 三地址清零), 无 DNS; 拉代理必须按 IP, 且板子要有物理以太网链路+DHCP 才行。
    无网时 `ai_dash_poll` 静默等 15s 再重试, 不会复位(已验证稳定)。
 
-## RAM 布局速查 (build/Debug/CubeMX_Config.map, -O0)
+## RAM 布局速查 (build/Debug/CubeMX_Config.map, 2026-08-30, -O2)
 
 ```
-Idle_TCB      0x20000810  0x5C
-Idle_Stack    0x2000086C  0x200   (configMINIMAL_STACK_SIZE=128 字)
-Timer_TCB     0x20000A6C  0x5C
-Timer_Stack   0x20000AC8  0x400   (configTIMER_TASK_STACK_DEPTH=256 字)
-ucHeap        0x20000EC8  0x8000  (FreeRTOS 堆, 任务栈从这里分配)
-xStart/pxEnd  0x20008EC8       (heap_4 元数据)
-BSS 结束      0x20019C74       (_ebss, RAM 128KB 还剩 ~25KB — 堆不越界, 别再怀疑这个)
-MSP 顶        0x20020000       (_estack, 保留区仅 _Min_Stack_Size=1KB)
+ucHeap        0x20001004  0xA000  (FreeRTOS 堆 40KB, 任务栈从这里分配; [mon] 实时水位)
+_sdata        0x20000000          (data+bss 起点, static=114824 由 [mon] 实时打印)
+_ebss         0x2001C088          (静态区结束)
+_sstack       0x2001FC00          (MSP 中断栈底, 保留 1KB; [mon] isr_stack 实时水印)
+_estack       0x20020000          (MSP 顶; CM4F 端口切换后 MSP 常驻 _estack-0x20 属正常)
+CCM           0x10000000  0x10000 (LVGL 渲染单缓冲 57.6KB, [mon] ccm 实时打印)
+外部 SRAM     0x68000000  0x100000 (LVGL 对象池 128KB@基址, [mon] eram 实时水位)
 ```
 
 ## 常用命令
