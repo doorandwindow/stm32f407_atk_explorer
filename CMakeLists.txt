@@ -66,6 +66,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     app/smart/smart_tick_task.c
     app/smart/smart_periodic_task.c
     app/smart/smart_alarm_task.c
+    app/smart/smart_ui_task.c
+
+    # small_smart UI (app/ui)
+    app/ui/smart_pages/smart_pages.c
+    app/ui/smart_pages/smart_page_main.c
+    app/ui/fonts/smart_cn_16.c
+    app/ui/fonts/smart_cn_24.c
 )
 
 # LVGL 8.3.11 源码
@@ -93,6 +100,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/app/tasks
     ${CMAKE_CURRENT_SOURCE_DIR}/app/ports
     ${CMAKE_CURRENT_SOURCE_DIR}/app/smart
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/ui/smart_pages
 
     # LVGL middleware
     ${CMAKE_CURRENT_SOURCE_DIR}/Middlewares/Third_Party/lvgl

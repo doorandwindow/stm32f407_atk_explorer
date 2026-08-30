@@ -113,7 +113,8 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  /* small_smart 移植任务 (P3 骨架, 硬件桩): 节拍 -> 控制状态机 -> 报警巡检 */
+  /* small_smart 移植: UI 任务先起(建屏), 骨架任务随后; 顺序无强依赖 */
+  smartUiHandle = osThreadNew(StartSmartUiTask, NULL, &smartUi_attributes);
   smartTickHandle = osThreadNew(StartSmartTickTask, NULL, &smartTick_attributes);
   smartPeriodicHandle = osThreadNew(StartSmartPeriodicTask, NULL, &smartPeriodic_attributes);
   smartAlarmHandle = osThreadNew(StartSmartAlarmTask, NULL, &smartAlarm_attributes);

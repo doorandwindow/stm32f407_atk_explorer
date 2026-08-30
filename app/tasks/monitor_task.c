@@ -45,6 +45,7 @@ extern osThreadId_t monitorTaskHandle;
 extern osThreadId_t smartTickHandle;
 extern osThreadId_t smartPeriodicHandle;
 extern osThreadId_t smartAlarmHandle;
+extern osThreadId_t smartUiHandle;
 
 /**
  * @brief  字节 -> 0.1KB 定点数(四舍五入), 打印时拆成 x.y
@@ -160,17 +161,18 @@ void StartMonitorTask(void *argument)
        高水位 = 栈创建后从未被写过的最小剩余。timer 服务任务栈固定 256 字,
        未列入(取其句柄需 INCLUDE_xTimerGetTimerDaemonTaskHandle, 暂不开) */
     {
-      const char *stk_names[6] = { "default", "monitor", "tick",
-                                   "periodic", "alarm", "idle" };
-      TaskHandle_t stk_hs[6];
+      const char *stk_names[7] = { "default", "monitor", "tick",
+                                   "periodic", "alarm", "ui", "idle" };
+      TaskHandle_t stk_hs[7];
       stk_hs[0] = defaultTaskHandle;
       stk_hs[1] = monitorTaskHandle;
       stk_hs[2] = smartTickHandle;
       stk_hs[3] = smartPeriodicHandle;
       stk_hs[4] = smartAlarmHandle;
-      stk_hs[5] = xTaskGetIdleTaskHandle();
+      stk_hs[5] = smartUiHandle;
+      stk_hs[6] = xTaskGetIdleTaskHandle();
       dbg_printf("[mon] stk(b)");
-      for (unsigned si = 0U; si < 6U; si++)
+      for (unsigned si = 0U; si < 7U; si++)
       {
         if (stk_hs[si] != NULL)
         {

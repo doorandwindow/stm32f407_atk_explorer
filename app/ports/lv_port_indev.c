@@ -11,6 +11,14 @@
 
 static lv_indev_drv_t indev_drv;
 
+/* ---- P4.0 横屏触摸映射 ----
+   GT9147 原生输出为面板物理坐标: x∈[0,479](480 轴), y∈[0,799](800 轴)。
+   横屏后 LVGL 的 x 轴即面板 800 轴, y 轴即 480 轴, 需要轴交换 + 镜像。
+   与 lcd.h 的 LCD_SCAN_MODE 配套:
+     LCD_SCAN_MODE=0x60 -> TP_MAP_FLIP=1 (ly = 479-原生x)
+     画面倒 180° 换 0xA0 -> TP_MAP_FLIP=0 (ly = 原生x, 同时 lx 改 799-原生y) */
+#define TP_MAP_FLIP 1
+
 /**
   * @brief LVGL 触摸读取回调
   */
@@ -19,6 +27,7 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     static GT_Point_t pt;
     static uint8_t pressed = 0;
     static uint8_t error_reported = 0;
+    static uint16_t last_lx = 0, last_ly = 0;   /* 最近一次映射后的 LVGL 坐标 */
     GT9147_ScanResult_t result;
 
     result = GT9147_Scan(&pt);
@@ -26,16 +35,27 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     {
         if (!pressed)
         {
-            dbg_printf("[dbg] TP pressed x=%u y=%u\r\n", pt.x, pt.y);
+            dbg_printf("[dbg] TP raw x=%u y=%u\r\n", pt.x, pt.y);
         }
         pressed = 1;
         error_reported = 0;
-        /* 边缘越界截断: 按到玻璃边缘时 GT9147 原始值会略超 480x800, 越界点会判定
+
+        /* 物理坐标 -> LVGL 横屏坐标: 轴交换, x 走面板 800 轴 */
+        uint16_t lx = pt.y;
+        uint16_t ly = pt.x;
+#if TP_MAP_FLIP
+        ly = (LCD_H - 1) - ly;
+#else
+        lx = (LCD_W - 1) - lx;
+#endif
+        /* 边缘越界截断: 按到玻璃边缘时 GT9147 原始值会略超量程, 越界点会判定
            为"没按到任何对象"导致事件丢失 */
-        if (pt.x >= LCD_W) pt.x = LCD_W - 1;
-        if (pt.y >= LCD_H) pt.y = LCD_H - 1;
-        data->point.x = pt.x;
-        data->point.y = pt.y;
+        if (lx >= LCD_W) lx = LCD_W - 1;
+        if (ly >= LCD_H) ly = LCD_H - 1;
+        last_lx = lx;
+        last_ly = ly;
+        data->point.x = lx;
+        data->point.y = ly;
     }
     else if (result == GT9147_SCAN_RELEASED)
     {
@@ -54,8 +74,8 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 
     /* Keep the last point and state when the controller has no new packet or
        a transient I2C error; neither condition is a release event. */
-    data->point.x = pt.x;
-    data->point.y = pt.y;
+    data->point.x = last_lx;
+    data->point.y = last_ly;
     data->state = pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 

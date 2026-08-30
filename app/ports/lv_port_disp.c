@@ -12,10 +12,11 @@
 #include "lvgl.h"
 #include "lcd.h"
 
-/* 部分刷新行数: 单缓冲 480 * 60 * 2B = 57.6KB, 放 CCM(0x10000000, 64KB)。
+/* 部分刷新行数: 单缓冲 800 * 36 * 2B = 57.6KB, 放 CCM(0x10000000, 64KB)。
+   P4.0 横屏化后行宽 480->800, 行数 60->36 保持 CCM 预算不变。
    渲染目标在 CCM 远快于外部 FSMC SRAM, 这是降低 lv_task_handler 耗时的关键。
    单缓冲即可(CCM 不能 DMA, 双缓冲无叠加收益)。 */
-#define DISP_BUF_LINES   60
+#define DISP_BUF_LINES   36
 #define DISP_BUF_PIXELS  (LCD_W * DISP_BUF_LINES)
 
 #define CCM_BUF_BASE  0x10000000UL

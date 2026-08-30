@@ -17,13 +17,16 @@
 extern osThreadId_t smartTickHandle;
 extern osThreadId_t smartPeriodicHandle;
 extern osThreadId_t smartAlarmHandle;
+extern osThreadId_t smartUiHandle;
 
 extern const osThreadAttr_t smartTick_attributes;
 extern const osThreadAttr_t smartPeriodic_attributes;
 extern const osThreadAttr_t smartAlarm_attributes;
+extern const osThreadAttr_t smartUi_attributes;
 
 void StartSmartTickTask(void *argument);     /* 1s: 节拍标志 + 桩数据 */
 void StartSmartPeriodicTask(void *argument); /* 10ms: 控制状态机(桩) + 1s 消费 */
 void StartSmartAlarmTask(void *argument);    /* 5s: 报警巡检 */
+void StartSmartUiTask(void *argument);       /* 5ms: LCD/LVGL + 页面管理器 */
 
 #endif /* SMART_TASKS_H */
