@@ -140,7 +140,7 @@ cmake --build build/Debug
       - FreeRTOS 堆 32KB→40KB(0xA000)：5 任务栈 30KB+TCB 超 32KB 曾致任务创建失败→IWDG 复位，已修复
       - ⚠ 未联网端到端验证：板载网卡需接有 DHCP 的局域网、板与 PC 同网段、`AIDASH_PROXY_IP` 指到 PC 真实 IP、
         并 `DEEPSEEK_API_KEY` 才能拉到真实数据；无网时稳定等待不崩（已上板验证）。本机网络为虚拟网卡，仅验证到"稳定+屏显示+等DHCP"
-- [x] 诊断功能：任务 `monitorTask`（每 10s 打印系统状态）—— **已上板验证**
+- [x] 诊断功能：任务 `monitorTask`（每 10s 打印系统状态，内存字段 KB 显示/0.1 定点）—— **已上板验证**
       - 三行输出：① `cpu x.x% + heap(bytes) 堆水位`；② `iram(bytes)` 主 SRAM 128KB（静态区=链接符号
         `_sdata~_ebss`，含 40KB 堆池；`isr_stack`=中断栈水印——图案填充+从栈底向上扫描取最深占用）
         `+ ccm(bytes)` CCM 64KB（LVGL 渲染单缓冲 57.6KB）；③ `eram(bytes)` 外部 SRAM 1MB（LVGL 对象池

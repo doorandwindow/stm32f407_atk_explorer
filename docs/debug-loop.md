@@ -64,11 +64,11 @@ DeepSeek 用量仪表盘（2026-08-29 新增，默认屏）:
 系统状态监控任务 (2026-08-30 新增, 已上板验证; 同日起周期 1s→10s 降噪):
 ```
 [mon] monitorTask started, period 10000ms
-[mon] cpu 5.8% | heap(bytes) total 40960 used 36744 free 4216 peak_used 36744 min_free 4216
-[mon] iram(bytes) total 131072 static 114824 isr_stack 92 free 16156 | ccm(bytes) total 65536 buf 57600 free 7936
-[mon] eram(bytes) total 1048576 pool 131072 used 15988 lvgl_max 7980
-      每 10s 三行; cpu=整机忙占比(稳态 ~5%)
-      heap = FreeRTOS 堆(heap_4); peak_used/min_free 是开机以来历史极值, 顶穿 40960 会触发 [HOOK] 复位
+[mon] cpu 5.8% | heap(kb) total 40.0 used 35.9 free 4.1 peak_used 35.9 min_free 4.1
+[mon] iram(kb) total 128.0 static 112.1 isr_stack 0.1 free 15.8 | ccm(kb) total 64.0 buf 56.3 free 7.8
+[mon] eram(kb) total 1024.0 pool 128.0 used 15.6 lvgl_max 7.8
+      每 10s 三行; cpu=整机忙占比(稳态 ~5%); 内存字段单位 KB(0.1 定点, 全整数换算)
+      heap = FreeRTOS 堆(heap_4); peak_used/min_free 是开机以来历史极值, 顶穿 40.0 会触发 [HOOK] 复位
       iram = 主 SRAM 128KB: static=data+bss(含 40KB 堆池 ucHeap), isr_stack=中断栈水印
              (图案填充+从栈底向上扫描, 深于 1KB 保留区即危险), free=total-static-isr_stack
       ccm  = CCM 64KB: LVGL 渲染单缓冲 57.6KB 固定占用

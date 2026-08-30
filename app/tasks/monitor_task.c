@@ -2,8 +2,9 @@
  ******************************************************************************
  * @file    monitor_task.c
  * @brief   系统状态监控任务 (10s 周期打印内存 + CPU 占用率)
- * @note    内存三层水位: ① FreeRTOS 堆(heap_4, xPortGetFreeHeapSize /
- *          xPortGetMinimumEverFreeHeapSize, 峰值=总量-历史最小剩余, 内核天然记录);
+ * @note    内存三层水位(KB 显示, 0.1KB 定点换算): ① FreeRTOS 堆(heap_4,
+ *          xPortGetFreeHeapSize / xPortGetMinimumEverFreeHeapSize, 峰值=总量-历史
+ *          最小剩余, 内核天然记录);
  *          ② 芯片内部主 SRAM 128KB(静态区 = 链接符号 _sdata~_ebss, 含 40KB 堆池)
  *             + CCM 64KB(LVGL 渲染单缓冲) + 中断栈水印(图案填充+扫描);
  *          ③ 外部 SRAM 1MB(LVGL 对象池 128KB@0x68000000, lv_mem_monitor 查动态水位)。
@@ -37,6 +38,15 @@ extern uint32_t _sdata;     /* .data 起始(RAM 侧) */
 extern uint32_t _ebss;      /* .bss 结束(静态占用 = data+bss, 含 40KB FreeRTOS 堆池 ucHeap) */
 
 extern uint32_t lv_port_disp_buf_bytes(void);   /* CCM 渲染单缓冲字节数 */
+
+/**
+ * @brief  字节 -> 0.1KB 定点数(四舍五入), 打印时拆成 x.y
+ * @note   全整数运算(FPU 未开), 精度 ~103 字节, 足够看水位
+ */
+static unsigned kb_x10(uint32_t bytes)
+{
+  return (unsigned)((bytes * 10U + 512U) / 1024U);
+}
 
 /**
  * @brief  MSP(中断栈)水印填充: [_sstack, _estack) 全部填图案
@@ -129,34 +139,40 @@ void StartMonitorTask(void *argument)
     uint32_t heap_free     = (uint32_t)xPortGetFreeHeapSize();
     uint32_t heap_min_free = (uint32_t)xPortGetMinimumEverFreeHeapSize();
 
-    dbg_printf("[mon] cpu %u.%u%% | heap(bytes) total %u used %u free %u peak_used %u min_free %u\r\n",
+    unsigned ht = kb_x10(heap_total);
+    unsigned hu = kb_x10(heap_total - heap_free);
+    unsigned hf = kb_x10(heap_free);
+    unsigned hp = kb_x10(heap_total - heap_min_free);
+    unsigned hm = kb_x10(heap_min_free);
+    dbg_printf("[mon] cpu %u.%u%% | heap(kb) total %u.%u used %u.%u free %u.%u peak_used %u.%u min_free %u.%u\r\n",
                (unsigned)(busy_pm / 10U), (unsigned)(busy_pm % 10U),
-               (unsigned)heap_total,
-               (unsigned)(heap_total - heap_free),
-               (unsigned)heap_free,
-               (unsigned)(heap_total - heap_min_free),
-               (unsigned)heap_min_free);
+               ht / 10U, ht % 10U, hu / 10U, hu % 10U, hf / 10U, hf % 10U,
+               hp / 10U, hp % 10U, hm / 10U, hm % 10U);
 
     /* ---- 芯片内部 RAM: 主 SRAM 静态区 + 中断栈水印; CCM 渲染缓冲 ---- */
     uint32_t isr_stack = isr_stack_used();
-    dbg_printf("[mon] iram(bytes) total %u static %u isr_stack %u free %u | ccm(bytes) total %u buf %u free %u\r\n",
-               (unsigned)iram_total,
-               (unsigned)iram_static,
-               (unsigned)isr_stack,
-               (unsigned)(iram_total - iram_static - isr_stack),
-               (unsigned)CCM_RAM_SIZE,
-               (unsigned)ccm_buf,
-               (unsigned)(CCM_RAM_SIZE - ccm_buf));
+    unsigned it = kb_x10(iram_total);
+    unsigned is = kb_x10(iram_static);
+    unsigned iw = kb_x10(isr_stack);
+    unsigned ifr = kb_x10(iram_total - iram_static - isr_stack);
+    unsigned ct = kb_x10(CCM_RAM_SIZE);
+    unsigned cb = kb_x10(ccm_buf);
+    unsigned cf = kb_x10(CCM_RAM_SIZE - ccm_buf);
+    dbg_printf("[mon] iram(kb) total %u.%u static %u.%u isr_stack %u.%u free %u.%u | ccm(kb) total %u.%u buf %u.%u free %u.%u\r\n",
+               it / 10U, it % 10U, is / 10U, is % 10U, iw / 10U, iw % 10U,
+               ifr / 10U, ifr % 10U, ct / 10U, ct % 10U, cb / 10U, cb % 10U,
+               cf / 10U, cf % 10U);
 
     /* ---- 芯片外部 RAM 1MB: 目前 LVGL 对象池(128KB@0x68000000)是唯一占用者 ----
        used = TLSF 池实时占用(含分配器块头开销); lvgl_max = LVGL 分配记账的
        历史峰值(lv_mem.c 按请求字节累计), 两者口径不同, max < used 属正常 */
     lv_mem_monitor_t lv_mem;
     lv_mem_monitor(&lv_mem);
-    dbg_printf("[mon] eram(bytes) total %u pool %u used %u lvgl_max %u\r\n",
-               (unsigned)BOARD_EXT_SRAM_SIZE,
-               (unsigned)lv_mem.total_size,
-               (unsigned)(lv_mem.total_size - lv_mem.free_size),
-               (unsigned)lv_mem.max_used);
+    unsigned eu = kb_x10(lv_mem.total_size - lv_mem.free_size);
+    unsigned em = kb_x10(lv_mem.max_used);
+    dbg_printf("[mon] eram(kb) total %u.%u pool %u.%u used %u.%u lvgl_max %u.%u\r\n",
+               kb_x10(BOARD_EXT_SRAM_SIZE) / 10U, kb_x10(BOARD_EXT_SRAM_SIZE) % 10U,
+               kb_x10(lv_mem.total_size) / 10U, kb_x10(lv_mem.total_size) % 10U,
+               eu / 10U, eu % 10U, em / 10U, em % 10U);
   }
 }
