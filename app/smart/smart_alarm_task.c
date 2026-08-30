@@ -17,10 +17,7 @@
 #include "uart_dbg.h"
 #include "smart_data.h"
 
-/* 报警编号 (源工程顺序约定, P5 报警页映射文案) */
-#define ALM_HIGH_TEMP   0u   /* 高温报警 */
-#define ALM_LOW_TEMP    1u   /* 低温报警 */
-#define ALM_SENS_FAULT  2u   /* 传感器故障 */
+/* 报警编号: 共享定义见 smart_data.h (UI 报警页按同表映射文案) */
 
 osThreadId_t smartAlarmHandle;
 const osThreadAttr_t smartAlarm_attributes = {
@@ -54,14 +51,14 @@ static void alarm_patrol(void)
 {
   int16_t diff = g_smart_data.t_avr - g_tar_temp;
 
-  alarm_set(ALM_HIGH_TEMP, (diff > 50) ? 1U : 0U);   /* > 目标 +5.0°C */
-  alarm_set(ALM_LOW_TEMP,  (diff < -50) ? 1U : 0U);  /* < 目标 -5.0°C */
+  alarm_set(SMART_ALM_HIGH_TEMP, (diff > 50) ? 1U : 0U);   /* > 目标 +5.0°C */
+  alarm_set(SMART_ALM_LOW_TEMP,  (diff < -50) ? 1U : 0U);  /* < 目标 -5.0°C */
 
   {
     const smart_error_t *e = (const smart_error_t *)&g_smart_err;
     uint8_t fault = (e->temp[0] || e->temp[1] || e->temp[2] ||
                      e->humi || e->co2 || e->pa) ? 1U : 0U;
-    alarm_set(ALM_SENS_FAULT, fault);
+    alarm_set(SMART_ALM_SENS_FAULT, fault);
   }
 
   /* 汇总标志 */

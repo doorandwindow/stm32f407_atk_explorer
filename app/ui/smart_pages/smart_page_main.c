@@ -56,6 +56,13 @@ static struct
   uint8_t dev[7];
 } cache;
 
+/* 设置入口: 切页在 UI 任务上下文执行 (lv_task_handler 调度, 安全) */
+static void setup_btn_event(lv_event_t *e)
+{
+  (void)e;
+  smart_pages_go(SMART_PAGE_SETUP);
+}
+
 /* ---- 小工具 ---- */
 
 /* 0.1 定点 -> "x.y" (负数安全, buf>=12B) */
@@ -168,7 +175,7 @@ void smart_page_main_create(lv_obj_t *parent)
 
   ui.banner = lv_obj_create(parent);
   lv_obj_set_size(ui.banner, 200, 36);
-  lv_obj_align(ui.banner, LV_ALIGN_TOP_RIGHT, -16, 10);
+  lv_obj_align(ui.banner, LV_ALIGN_TOP_MID, 0, 10);
   lv_obj_set_style_radius(ui.banner, 6, 0);
   lv_obj_set_style_bg_color(ui.banner, lv_color_hex(COL_OK), 0);
   lv_obj_set_style_border_width(ui.banner, 0, 0);
@@ -177,6 +184,21 @@ void smart_page_main_create(lv_obj_t *parent)
   lv_obj_set_style_text_font(ui.banner_label, &smart_cn_16, 0);
   lv_obj_set_style_text_color(ui.banner_label, lv_color_hex(0x10141A), 0);
   lv_obj_center(ui.banner_label);
+
+  /* 设置入口 (右上角) */
+  lv_obj_t *setup_btn = lv_btn_create(parent);
+  lv_obj_set_size(setup_btn, 110, 40);
+  lv_obj_align(setup_btn, LV_ALIGN_TOP_RIGHT, -16, 10);
+  lv_obj_set_style_bg_color(setup_btn, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(setup_btn, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(setup_btn, 1, 0);
+  lv_obj_set_style_radius(setup_btn, 6, 0);
+  lv_obj_t *setup_lb = lv_label_create(setup_btn);
+  lv_label_set_text(setup_lb, LV_SYMBOL_SETTINGS " " TXT_SETUP_TITLE);
+  lv_obj_set_style_text_font(setup_lb, &smart_cn_16, 0);
+  lv_obj_set_style_text_color(setup_lb, lv_color_hex(COL_TXT), 0);
+  lv_obj_center(setup_lb);
+  lv_obj_add_event_cb(setup_btn, setup_btn_event, LV_EVENT_CLICKED, NULL);
 
   /* ---- 左侧数据卡 2x3, 每张 210x126, 起点 (16, 60) ---- */
   lv_obj_t *c;

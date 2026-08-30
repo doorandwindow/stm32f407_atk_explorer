@@ -83,8 +83,12 @@ typedef struct
 extern volatile smart_state_t g_smart_state;
 
 /* ---- 报警 (源 APP_Alarm.h 精简: 巡检由 smart_alarm 任务做) ----
- * id 沿源工程报警编号约定, P5 接 UI 时补全映射表 */
+ * 编号沿用源工程 __AlarmCnt=11 约定的前 3 项, UI 按编号映射文案 */
 #define SMART_ALARM_CNT 11u
+
+#define SMART_ALM_HIGH_TEMP   0u   /* 高温报警 */
+#define SMART_ALM_LOW_TEMP    1u   /* 低温报警 */
+#define SMART_ALM_SENS_FAULT  2u   /* 传感器故障 */
 
 typedef struct
 {

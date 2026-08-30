@@ -71,6 +71,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # small_smart UI (app/ui)
     app/ui/smart_pages/smart_pages.c
     app/ui/smart_pages/smart_page_main.c
+    app/ui/smart_pages/smart_page_setup.c
+    app/ui/smart_pages/smart_page_alarms.c
+    app/ui/smart_pages/smart_page_tartemp.c
+    app/ui/smart_pages/smart_page_about.c
     app/ui/fonts/smart_cn_16.c
     app/ui/fonts/smart_cn_24.c
 )
