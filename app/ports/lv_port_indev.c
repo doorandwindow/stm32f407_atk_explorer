@@ -11,6 +11,14 @@
 
 static lv_indev_drv_t indev_drv;
 
+/* ---- 触摸健康度: 连续 I2C 错误计数 (PRESSED/RELEASED 即清零) ----
+   供电欠压把 GT917S 打挂时 I2C 持续 NACK, 此计数持续上涨;
+   smart_ui 主循环据此触发 GT 重初始化自愈 (2026-09-23 ESP8266 接入后新增) */
+static volatile uint16_t s_tp_err_run = 0;
+
+uint16_t lv_port_indev_tp_err_run(void)  { return s_tp_err_run; }
+void     lv_port_indev_tp_err_reset(void){ s_tp_err_run = 0; }
+
 /* ---- P4.0 横屏触摸映射 ----
    GT9147 原生输出为面板物理坐标: x∈[0,479](480 轴), y∈[0,799](800 轴)。
    横屏后 LVGL 的 x 轴即面板 800 轴, y 轴即 480 轴, 需要轴交换 + 镜像。
@@ -33,6 +41,7 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     result = GT9147_Scan(&pt);
     if (result == GT9147_SCAN_PRESSED)
     {
+        s_tp_err_run = 0;
         if (!pressed)
         {
             dbg_printf("[dbg] TP raw x=%u y=%u\r\n", pt.x, pt.y);
@@ -59,6 +68,7 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
     }
     else if (result == GT9147_SCAN_RELEASED)
     {
+        s_tp_err_run = 0;
         if (pressed)
         {
             dbg_printf("[dbg] TP released\r\n");
@@ -66,10 +76,14 @@ static void indev_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
         pressed = 0;
         error_reported = 0;
     }
-    else if (result == GT9147_SCAN_ERROR && !error_reported)
+    else if (result == GT9147_SCAN_ERROR)
     {
-        dbg_printf("[dbg] TP I2C error\r\n");
-        error_reported = 1;
+        if (s_tp_err_run < 0xFFFF) s_tp_err_run++;
+        if (!error_reported)
+        {
+            dbg_printf("[dbg] TP I2C error\r\n");
+            error_reported = 1;
+        }
     }
 
     /* Keep the last point and state when the controller has no new packet or
