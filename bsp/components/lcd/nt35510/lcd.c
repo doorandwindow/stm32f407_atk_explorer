@@ -182,8 +182,9 @@ void LCD_Init(void)
         LCD_WriteReg(nt35510_init_table[i].reg, nt35510_init_table[i].data);
     }
 
-    /* 扫描方向: 竖屏 L2R_U2D, NT35510 不需要 BGR 位 */
-    LCD_WriteReg(0x3600, 0x00);
+    /* 扫描方向: P4.0 横屏化 800x480, 值含义见 lcd.h LCD_SCAN_MODE 注释表
+       (0x00=旧竖屏 480x800; 0x60=横屏候选A; 0xA0=横屏候选B, 画面倒 180° 时换) */
+    LCD_WriteReg(0x3600, LCD_SCAN_MODE);
 
     /* 写窗口范围（全屏） */
     LCD_WR_REG(NT_CMD_SETX);

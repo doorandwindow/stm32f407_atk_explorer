@@ -13,9 +13,18 @@
 
 #include "main.h"
 
-/* LCD 尺寸（竖屏） */
-#define LCD_W   480
-#define LCD_H   800
+/* LCD 尺寸 (2026-08-30 P4.0 横屏化 800x480, 对齐源工程大彩屏横版布局):
+   LVGL 逻辑坐标系为横屏, 物理扫描方向由 LCD_SCAN_MODE 切换, 触摸变换见
+   lv_port_indev.c 的 TP_LANDSCAPE_MAP。若上板发现画面/触摸方向不对,
+   按 lcd.c 中 LCD_SCAN_MODE 注释表换值(一行), 或换用另一组触摸映射。 */
+#define LCD_W   800
+#define LCD_H   480
+
+/* NT35510 0x3600 (Address Mode) 扫描方向值:
+   0x00 = 竖屏 480x800 (L2R, U2D, 旧配置)
+   0x60 = 横屏 800x480 候选A (90° 旋转, 默认)
+   0xA0 = 横屏 800x480 候选B (反向 90°, 候选A 画面倒 180° 时换它, 触摸映射同时换) */
+#define LCD_SCAN_MODE   0x60
 
 /* 背光引脚 */
 #define LCD_BL_GPIO_PORT   GPIOB
