@@ -52,6 +52,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     bsp/components/touch/gt9147/gt9147.c
     bsp/components/uart/uart_dbg/uart_dbg.c
     bsp/components/rtstats/rtstats_tim.c
+    bsp/components/esp8266/esp8266_uart.c
 
     # Application layer
     app/ports/lv_port_disp.c
@@ -59,6 +60,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
     # Application tasks
     app/tasks/monitor_task.c
+    app/tasks/esp_task.c            # N2: ESP8266 链路状态机 + 5s 心跳 (net_probe_task.c 退役出构建)
 
     # small_smart 移植 (app/smart)
     app/smart/smart_data.c
@@ -98,6 +100,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/touch/gt9147
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/uart/uart_dbg
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/rtstats
+    ${CMAKE_CURRENT_SOURCE_DIR}/bsp/components/esp8266
 
     # Application layer includes
     ${CMAKE_CURRENT_SOURCE_DIR}/app/core

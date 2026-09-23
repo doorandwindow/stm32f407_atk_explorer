@@ -29,6 +29,7 @@
 #include "iwdg.h"
 #include "smart_tasks.h"
 #include "smart_data.h"
+#include "esp8266_uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,6 +75,10 @@ const osThreadAttr_t monitorTask_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void StartMonitorTask(void *argument);
+void StartEspTask(void *argument);        /* N2 精简版: WiFi/TCP 状态机 + 5s 心跳 */
+extern osThreadId_t       espTaskHandle;  /* 定义在 esp_task.c */
+extern const osThreadAttr_t espTask_attributes;
+extern volatile uint8_t   g_net_status;   /* 0=离线 1=WiFi 2=TCP在线 (UI/mon 只读) */
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -119,6 +124,9 @@ void MX_FREERTOS_Init(void) {
   smartPeriodicHandle = osThreadNew(StartSmartPeriodicTask, NULL, &smartPeriodic_attributes);
   smartAlarmHandle = osThreadNew(StartSmartAlarmTask, NULL, &smartAlarm_attributes);
   monitorTaskHandle = osThreadNew(StartMonitorTask, NULL, &monitorTask_attributes);
+  /* N2 (2026-09-23): espTask 常驻上线 - WiFi/TCP 状态机 + 5s 心跳 (probe 已退役) */
+  esp8266_uart_init();
+  espTaskHandle = osThreadNew(StartEspTask, NULL, &espTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */

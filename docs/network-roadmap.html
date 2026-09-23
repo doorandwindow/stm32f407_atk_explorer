@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP8266 联网功能开发计划 · N0-N5</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2d3748;
+    --tx:#e6edf3; --tx2:#9aa7b8; --tx3:#6b7a8f;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#58a6ff; --purple:#bc8cff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--tx);font-family:"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.65;padding:32px 20px;max-width:1080px;margin:0 auto;}
+  h1{font-size:26px;margin-bottom:4px;}
+  h2{font-size:19px;margin:34px 0 14px;padding-left:12px;border-left:4px solid var(--blue);}
+  h3{font-size:15px;color:var(--tx2);margin:18px 0 8px;}
+  .sub{color:var(--tx3);font-size:13px;margin-bottom:24px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr;}}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0;}
+  th{background:var(--panel2);color:var(--tx2);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap;}
+  td{padding:7px 10px;border-bottom:1px solid #212a3a;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#212a3a;padding:1px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:12.5px;color:#79c0ff;}
+  .tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;margin-right:6px;}
+  .t-green{background:rgba(63,185,80,.15);color:var(--green);}
+  .t-red{background:rgba(248,81,73,.15);color:var(--red);}
+  .t-amber{background:rgba(210,153,34,.15);color:var(--amber);}
+  .t-blue{background:rgba(88,166,255,.15);color:var(--blue);}
+  .t-purple{background:rgba(188,140,255,.15);color:var(--purple);}
+  .verdict li{margin:9px 0 9px 4px;list-style:none;padding-left:26px;position:relative;font-size:14.5px;}
+  .verdict li::before{content:"▸";position:absolute;left:4px;color:var(--blue);}
+  .small{font-size:12px;color:var(--tx3);}
+  .risk{border-left:3px solid;padding:10px 14px;margin:10px 0;background:var(--panel2);border-radius:0 8px 8px 0;font-size:13.5px;}
+  .r-red{border-color:var(--red);}
+  .r-amber{border-color:var(--amber);}
+  .risk b{display:block;margin-bottom:3px;}
+  .phase{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:12px 0;}
+  .phase h3{margin-top:0;color:var(--tx);font-size:16px;}
+  .phase .meta{font-size:12.5px;color:var(--tx3);margin-bottom:8px;}
+  .gate{background:rgba(63,185,80,.08);border:1px dashed rgba(63,185,80,.4);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:13px;}
+  .gate b{color:var(--green);}
+  .flow{font-family:Consolas,monospace;font-size:12.5px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;color:var(--tx2);overflow-x:auto;margin:10px 0;}
+  .kbd{color:var(--amber);}
+</style>
+</head>
+<body>
+
+<h1>ESP8266 联网功能开发计划</h1>
+<div class="sub">USART3 (PB10/PB11) + ESP8266 AT 固件 · 制定于 2026-09-23 · 基于 N0 前可查证的全部工程事实</div>
+
+<div class="card verdict">
+  <span class="tag t-blue">结论先行</span>
+  <ul>
+    <li><b>路线已定：</b>ESP8266 保持 <b>AT 固件</b>，STM32 侧自写<b>轻量 AT 引擎</b>（~700 行，FreeRTOS 原生），一期 TCP 透传上报环境数据，二期按固件能力决定是否直接上 MQTT AT。</li>
+    <li><b>不引入 LwIP：</b>P2 刚把 LwIP+ETH 拔掉省出 64KB RAM，ESP8266 走 AT 天然不需要协议栈——这条路和当年决策自洽。</li>
+    <li><b>不搬源工程代码：</b>AIR724 的 <code>at_device</code> 是 RT-Thread 框架组件（2360 行，深度耦合 at_client/netdev），只借鉴其"设备控制操作集 + URC 表 + 状态机"设计，代码重写。</li>
+    <li><b>硬件白送：</b>ioc 里 USART3 已配好异步+上拉，<code>MX_USART3_UART_Init()</code> 已在生成序列——P1 直接从驱动层开始，不碰 CubeMX 图形界面。</li>
+    <li><b>总盘子 6 天</b>（N0~N5），3 个人工审核点，每阶段有明确验收门。</li>
+  </ul>
+</div>
+
+<h2>① 方案选型（为什么不走别的路）</h2>
+<div class="card">
+  <table>
+    <tr><th>方案</th><th>说明</th><th>结论</th></tr>
+    <tr><td><b>A. AT 固件 + 自写 AT 引擎</b></td><td>ESP8266 官方/安信可 AT 固件，STM32 串口发 AT 指令，自写轻量解析器</td><td><span class="tag t-green">✅ 采用</span>零 ESP 侧开发、RAM 占用最小、协议可控</td></tr>
+    <tr><td>B. 移植 RT-Thread at_client</td><td>源工程 AIR724 同款框架</td><td><span class="tag t-red">❌ 否决</span>深度耦合 RTOS，移植成本 &gt; 重写，且引入大堆依赖</td></tr>
+    <tr><td>C. LwIP + ESP8266 PPP</td><td>STM32 跑完整协议栈，ESP 只当调制解调器</td><td><span class="tag t-red">❌ 否决</span>复杂度爆炸，还把刚省出来的 64KB RAM 吃回去</td></tr>
+    <tr><td>D. ESP8266 刷 NodeMCU/自写固件</td><td>双端开发，自定义串口协议</td><td><span class="tag t-amber">暂缓</span>多一块开发调试工作量；除非 AT 固件版本烂到没法用才回头考虑</td></tr>
+  </table>
+</div>
+
+<h2>② 数据流架构（怎么嵌进现有骨架）</h2>
+<div class="card">
+  <div class="flow">USART3 中断收 ──▶ 环形缓冲 ──▶ 行分帧 ──▶ AT 引擎解析
+                                        │
+              ┌─────────────────────────┤
+              ▼                         ▼
+        [espTask 新增]            URC: +IPD / WIFI DISCONNECT
+        1s 周期状态机                  │
+        ├─ 读 smart_data 快照          ▼
+        ├─ 序列化(0.1定点→文本) ──▶ CIPSEND 上报
+        └─ 写 g_net_status ──▶ smart_data ──▶ UI WiFi 图标
+        （单写多读原则不破坏：net 字段唯一生产者是 espTask）</div>
+  <p class="small">关键约束：UI 永不直接等网络；网络下行命令（二期）经命令队列转交 smartPeriodic 应用，不抢 smart_data 单写者地位。</p>
+</div>
+
+<h2>③ 阶段计划 N0–N5</h2>
+
+<div class="phase">
+  <h3>N0 硬件体检 <span class="tag t-amber">0.5 天 · 人工审核点 1</span></h3>
+  <div class="meta">目标：摸清模组底细，锁死二期 MQTT 走法</div>
+  <table>
+    <tr><th>#</th><th>事项</th><th>验收</th></tr>
+    <tr><td>1</td><td>核对接线：PB10(TX)→ESP8266 RX，PB11(RX)→ESP8266 TX，共地，独立 3.3V 供电</td><td>万用表确认 3.3V ≥ 3.0V 且不跌落</td></tr>
+    <tr><td>2</td><td>USART1 调试口透传 AT（临时桥接脚本），发 <code>AT+GMR</code> / <code>AT+CWMODE?</code></td><td>拿到固件版本号 + 模式能力清单</td></tr>
+    <tr><td>3</td><td>决策：固件 ≥ esp-at v2.2 → 二期直接 <code>AT+MQTT*</code>；否则二期 TCP 收尾</td><td>本计划 ④ 节勾选最终走法</td></tr>
+  </table>
+  <div class="gate"><b>审核门：</b>版本/供电结论同步同学，确认 WiFi 热点 SSID/密码与云端形态（TCP 直连 or MQTT broker）。</div>
+</div>
+
+<div class="phase">
+  <h3>N1 串口驱动层 <span class="tag t-blue">1 天</span></h3>
+  <div class="meta">新文件：<code>bsp/components/esp8266/esp8266_uart.c/.h</code>（约 200 行）</div>
+  <table>
+    <tr><th>#</th><th>事项</th><th>要点</th></tr>
+    <tr><td>1</td><td>USART3 中断收（<code>HAL_UART_Receive_IT</code> 单字节 + 环形缓冲 1KB）</td><td>115200 下 11.5k 中断/s ≈ CPU 1~2%，168MHz 无压力；<b>故意不用 DMA</b>——不必改 ioc，避开 CubeMX 重生成回退风险</td></tr>
+    <tr><td>2</td><td>行分帧器：<code>\r\n</code> 结尾成行，最长 512B 溢出保护</td><td>AT 响应 + URC 全按行处理</td></tr>
+    <tr><td>3</td><td>阻塞发送 + 发送互斥（AT 命令是半双工问答）</td><td>FreeRTOS mutex</td></tr>
+    <tr><td>4</td><td>测试桩：上电发 <code>AT</code> → 收 <code>OK</code>，[esp] 前缀打日志</td><td>CMakeLists 加 target_sources + include（显式列表，别忘）</td></tr>
+  </table>
+  <div class="gate"><b>验收门：</b>串口见 <code>[esp] AT -> OK</code> 往返 100 次零错位。</div>
+</div>
+
+<div class="phase">
+  <h3>N2 AT 引擎 <span class="tag t-blue">1.5 天</span></h3>
+  <div class="meta">新文件：<code>bsp/components/esp8266/esp8266_at.c/.h</code>（约 500 行）+ <code>app/smart/smart_net_task.c/.h</code></div>
+  <table>
+    <tr><th>#</th><th>事项</th><th>要点</th></tr>
+    <tr><td>1</td><td>命令-响应引擎：<code>at_cmd(req, expect[], timeout)</code> 带超时重试 ×2</td><td>借鉴源工程 at_device 的命令表思想，返回码统一 <code>ESP_OK/ESP_ERR/ESP_TIMEOUT</code></td></tr>
+    <tr><td>2</td><td>URC 分发表：<code>+IPD</code>（下行数据）/ <code>WIFI DISCONNECT</code> / <code>busy p...</code></td><td>URC 异步到达，引擎收完响应后扫描残留行</td></tr>
+    <tr><td>3</td><td>espTask（4KB 栈起步，osPriorityNormal）：开机自检 → WiFi 状态机（init→connecting→online→reconnect）</td><td>栈水位靠 [mon] 实测后裁剪（×2 峰值法，历史铁律）；IWDG 由 defaultTask 喂，espTask 无狗压力</td></tr>
+    <tr><td>4</td><td>freertos.c 创建任务 + smart_data.h 增加 <code>g_net_status</code>（0 离线/1 连接中/2 在线）</td><td>monitor_task 的 stk 行自动覆盖新任务</td></tr>
+  </table>
+  <div class="gate"><b>验收门：</b>上电自动连 WiFi，<code>[esp] WIFI CONNECTED, ip=x.x.x.x</code>；拔路由器 30s 内自动重连。</div>
+</div>
+
+<div class="phase">
+  <h3>N3 WiFi + TCP 透传 <span class="tag t-blue">1 天</span></h3>
+  <div class="meta">打通端到端：smart_data → 云端可见</div>
+  <table>
+    <tr><th>#</th><th>事项</th><th>要点</th></tr>
+    <tr><td>1</td><td>连接序列：<code>CWMODE=1 → CWJAP → CIPSTART → CIPMODE=1 → CIPSEND</code></td><td>透传退出坑：<code>+++</code> 前后各 1s 静默，封装成 <code>esp_exit_transparent()</code></td></tr>
+    <tr><td>2</td><td>上报帧：1s 周期打包 temp[3]/humi/co2/pa/tar_temp（0.1 定点整数，JSON 单行）</td><td>变化检测：值没变不发，省流量（沿 UI 刷新同款模式）</td></tr>
+    <tr><td>3</td><td>PC 端验证服务：<code>python -m serial.tools</code> 同款思路写 20 行 TCP 收包脚本</td><td>tools/ 下 net_recv.py，验收时可复用</td></tr>
+  </table>
+  <div class="gate"><b>审核门 2：</b>PC 收到实时环境数据 JSON；掉线→重连→续报全程无人工干预。</div>
+</div>
+
+<div class="phase">
+  <h3>N4 应用集成 <span class="tag t-purple">1.5 天</span></h3>
+  <div class="meta">让联网"看得见"</div>
+  <table>
+    <tr><th>#</th><th>事项</th><th>要点</th></tr>
+    <tr><td>1</td><td>UI 网络图标：主页顶部横幅右侧 WiFi 状态图标（LV_SYMBOL_WIFI + 颜色区分）</td><td>字库不用动（图标走 montserrat_20 回退链）；smart_text.h 若加中文文案需重生成字库（debug-loop 坑 12）</td></tr>
+    <tr><td>2</td><td>报警推送：smart_alarm 置报警沿时 espTask 立即插发报警帧</td><td>复用 11 项报警表编号，云端按编号映射</td></tr>
+    <tr><td>3</td><td>（可选二期）下行控制：TCP 收 JSON 命令 → 命令队列 → smartPeriodic 应用</td><td>目标温度 g_tar_temp 远程修改走队列仲裁，保住单写者原则</td></tr>
+    <tr><td>4</td><td>MQTT（视 N0 结论）：esp-at v2.2 则 <code>AT+MQTTUSERCFG/MQTTCONN/MQTTPUB</code> 替换透传层</td><td>上报层与传输层解耦，换 MQTT 只动 N3 的序列函数</td></tr>
+  </table>
+  <div class="gate"><b>验收门：</b>UI 图标三态正确；报警沿 1s 内云端可见。</div>
+</div>
+
+<div class="phase">
+  <h3>N5 老化验收 + 收尾 <span class="tag t-green">0.5 天 · 人工审核点 3</span></h3>
+  <div class="meta">照 P6 标准来</div>
+  <table>
+    <tr><th>#</th><th>事项</th></tr>
+    <tr><td>1</td><td>30min 联网老化：零复位 / 零 [HOOK] / heap 与 espTask 栈水位平稳 / 断路由重连 ≥2 次</td></tr>
+    <tr><td>2</td><td>文档三件套：README 进度勾选（只写真做完的）+ debug-loop.md 加 ESP8266 坑清单 + architecture.md 补 espTask</td></tr>
+    <tr><td>3</td><td><b>当天 commit</b>（吸取 lcd.c/lcd.h 挂 24 天的教训，一个阶段一个 commit）</td></tr>
+  </table>
+</div>
+
+<h2>④ N0 决策树（MQTT 走法预埋）</h2>
+<div class="card">
+  <div class="flow">AT+GMR 结果
+   ├─ esp-at v2.2+（乐鑫官方新版）──▶ 二期直接 AT+MQTT*（N4.4 走此路，推荐）
+   ├─ 安信可 v1.x（老固件）────────▶ 一期 TCP 收尾即闭环；要 MQTT 就先 USB-TTL 给 ESP8266 刷 esp-at
+   └─ 其他/魔改固件 ───────────────▶ AT 行为对不上就刷机，别硬适配</div>
+</div>
+
+<h2>⑤ 资源预算与红线</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>预算（对照现有余量）</h3>
+    <table>
+      <tr><th>资源</th><th>新增</th><th>余量核对</th></tr>
+      <tr><td>Flash</td><td>~15KB（AT 引擎+任务+字符串表）</td><td>273KB/1MB ✅</td></tr>
+      <tr><td>espTask 栈</td><td>4KB（ucHeap 分配）</td><td>heap min_free 23.3KB ✅ 但紧，水位实测后可回落到 3KB</td></tr>
+      <tr><td>收发缓冲</td><td>~1.5KB static</td><td>主 SRAM free 80.4KB ✅</td></tr>
+      <tr><td>CPU</td><td>+1~2%（中断收）</td><td>稳态 5.1% ✅</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>⚠ 红线（每条都踩过或高发）</h3>
+    <div class="risk r-red"><b>供电是 ESP8266 第一大坑</b>ESP-01S 峰值 300mA+，探索者板载 3.3V 直接带会电压跌落→模组莫名复位掉线。独立 LDO 或 ≥470µF 电容就近储能。</div>
+    <div class="risk r-amber"><b>新增文件必须当天进 CMakeLists + commit</b>显式文件列表忘了加=编译报 undefined；改动挂着不提交=上次 lcd.c 事故重演。</div>
+    <div class="risk r-amber"><b>[esp] 日志与 [mon]/[ui] 并发</b>USART1 是共享受限资源，esp 日志走同一 dbg_printf，注意别在 ISR 里打。</div>
+    <div class="risk r-amber"><b>栈顶穿 = IWDG 循环复位</b>新任务上线第一时间看 [mon] stk 行，espTask 峰值 ×2 不足 4KB 立即调。</div>
+  </div>
+</div>
+
+<h2>⑥ 文件落位总览</h2>
+<div class="card">
+<pre style="font-size:12.5px;color:var(--tx2);overflow-x:auto;">bsp/components/esp8266/
+  esp8266_uart.c/.h     # N1: USART3 中断收 + 环形缓冲 + 行分帧 (~200 行)
+  esp8266_at.c/.h       # N2: AT 命令引擎 + URC 分发 + 状态机 (~500 行)
+app/smart/
+  smart_net_task.c/.h   # N2: espTask，WiFi/TCP 状态机 + 数据上报 (~300 行)
+app/smart/smart_data.h  # + g_net_status 网络状态（espTask 唯一写者）
+app/tasks/freertos.c    # + espTask 创建
+app/ui/smart_pages/     # N4: 主页 WiFi 图标
+CMakeLists.txt          # + 3 对 target_sources/include
+tools/net_recv.py       # N3: PC 端 TCP 收包验证脚本</pre>
+  <p class="small">CMakeLists.txt 是显式列表——新增 3 对源文件记得同步 target_sources + target_include_directories，然后 cmake --preset Debug 重配置。</p>
+</div>
+
+<p class="small" style="margin-top:22px;text-align:center;">计划制定：WorkBuddy · 2026-09-23 · 依据：CubeMX_Config.ioc 实测 / 源工程 at_device 结构分析 / 主仓 [mon] 水位基线 / debug-loop.md 坑清单</p>
+</body>
+</html>
